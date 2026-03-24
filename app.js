@@ -381,11 +381,17 @@ async function segmentarPersona(imagen) {
 // ========================================
 
 function onPoseResults(results) {
-    // Limpiar canvas
+    // Limpiar canvas principal
     State.ctx.clearRect(0, 0, State.canvasElement.width, State.canvasElement.height);
     
-    // Limpiar hilo de dibujo de manos
-    if (State.overlayCtx) {
+    // Limpiar y alinear lienzo del overlay track
+    if (State.overlayCtx && State.videoElement.videoWidth) {
+        // MUY IMPORTANTE: Sincronizar el aspect ratio EXACTO de la cámara de video real
+        // para que object-fit: cover mueva y recorte la cámara y el dibujo por igual.
+        if (State.overlayCanvas.width !== State.videoElement.videoWidth) {
+            State.overlayCanvas.width = State.videoElement.videoWidth;
+            State.overlayCanvas.height = State.videoElement.videoHeight;
+        }
         State.overlayCtx.clearRect(0, 0, State.overlayCanvas.width, State.overlayCanvas.height);
     }
 
@@ -393,7 +399,7 @@ function onPoseResults(results) {
         State.ultimoLandmarks = results.poseLandmarks;
 
         // Dibujar indicador visual de las manos
-        if (State.overlayCtx) {
+        if (State.overlayCtx && State.videoElement.videoWidth) {
             drawHandTracking(results.poseLandmarks, State.overlayCtx, State.overlayCanvas.width, State.overlayCanvas.height);
         }
 
@@ -860,33 +866,18 @@ function iniciarExperienciaTraje() {
 }
 
 function iniciarDatosCuriosos(traje) {
-    // Limpiar interval anterior
+    // Limpiar interval anterior si existía (por compatibilidad)
     if (State.datosCuriososInterval) {
         clearInterval(State.datosCuriososInterval);
+        State.datosCuriososInterval = null;
     }
 
-    let datoIndex = 0;
     const dato1 = $('#dato-1');
     const dato2 = $('#dato-2');
 
-    function mostrarSiguienteDato() {
-        const dato = traje.datosCuriosos[datoIndex % traje.datosCuriosos.length];
-
-        // Alternar entre los dos contenedores
-        if (datoIndex % 2 === 0) {
-            dato1.textContent = `¿Sabías que? ${dato}`;
-        } else {
-            dato2.textContent = `¿Sabías que? ${dato}`;
-        }
-
-        datoIndex++;
-    }
-
-    // Mostrar primer dato
-    mostrarSiguienteDato();
-
-    // Cambiar cada 8 segundos
-    State.datosCuriososInterval = setInterval(mostrarSiguienteDato, 8000);
+    // Rellenamos ambos contenedores. El CSS se encarga de alternarlos automáticamente (fade de 16 segundos)
+    dato1.textContent = `¿Sabías que? ${traje.datosCuriosos[0] || ''}`;
+    dato2.textContent = `¿Sabías que? ${traje.datosCuriosos[1] || ''}`;
 }
 
 // ========================================

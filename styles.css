@@ -134,10 +134,11 @@ html, body {
     opacity: 0;
     animation: flotar-texto 12s infinite;
     position: absolute;
-    width: 80vw;
+    width: 90vw;
     left: 50%;
     transform: translateX(-50%);
-    white-space: nowrap;
+    white-space: normal; /* Ahora el texto puede hacer saltos de línea */
+    word-wrap: break-word;
 }
 
 #texto-1 { animation-delay: 0s; }
@@ -366,30 +367,31 @@ html, body {
     pointer-events: none;
 }
 
-.dato-curioso {
-    background: rgba(0, 0, 0, 0.7);
-    backdrop-filter: blur(10px);
-    padding: 15px 25px;
-    border-radius: var(--radio-borde);
-    border-left: 4px solid var(--color-accent);
-    font-size: clamp(0.9rem, 3vw, 1.1rem);
+.dato-texto {
+    position: absolute;
+    width: 100%;
+    font-size: 1.1rem;
+    font-style: italic;
     color: #fff;
-    margin-bottom: 15px;
+    background: rgba(0, 0, 0, 0.7);
+    padding: 15px 25px;
+    border-radius: 15px;
+    border-left: 4px solid var(--color-accent);
     opacity: 0;
-    transform: translateX(-30px);
-    animation: dato-appear 8s infinite;
-    text-align: center;
+    animation: fadeDato 16s infinite; /* 16 segundos en total para ciclar 2 textos */
 }
 
-#dato-1 { animation-delay: 2s; }
-#dato-2 { animation-delay: 6s; }
+#dato-1 {
+    animation-delay: 0s;
+}
 
-@keyframes dato-appear {
-    0% { opacity: 0; transform: translateX(-30px); }
-    10% { opacity: 1; transform: translateX(0); }
-    40% { opacity: 1; transform: translateX(0); }
-    50% { opacity: 0; transform: translateX(30px); }
-    100% { opacity: 0; }
+#dato-2 {
+    animation-delay: 8s; /* Inicia justo en la mitad del ciclo */
+}
+
+@keyframes fadeDato {
+    0%, 50%, 100% { opacity: 0; transform: translateY(10px); }
+    5%, 45% { opacity: 1; transform: translateY(0); }
 }
 
 /* Info del traje */
