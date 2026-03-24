@@ -118,8 +118,39 @@ const State = {
     bodyPixNet: null,           // Modelo BodyPix cargado
     segmentacionData: null,     // Datos de segmentación del cuerpo
     ultimoLandmarks: null,      // Últimos landmarks detectados
-    fotoLandmarks: null         // Landmarks guardados al tomar la foto
+    fotoLandmarks: null,        // Landmarks guardados al tomar la foto
+    historialDespedida: []      // Seguimiento del movimiento de la muñeca para despedida
 };
+
+// Variable para el control del volumen de la música
+let fadeInterval = null;
+
+function fadeAudio(audioElement, targetVolume, duration) {
+    if (!audioElement) return;
+    
+    if (fadeInterval) clearInterval(fadeInterval);
+    
+    const startVolume = audioElement.volume;
+    const volumeChange = targetVolume - startVolume;
+    const ticks = 20; // 20 pasos de animación
+    const tickTime = duration / ticks;
+    let currentTick = 0;
+    
+    fadeInterval = setInterval(() => {
+        currentTick++;
+        let newVol = startVolume + (volumeChange * (currentTick / ticks));
+        if (newVol > 1) newVol = 1;
+        if (newVol < 0) newVol = 0;
+        
+        audioElement.volume = newVol;
+        
+        if (currentTick >= ticks) {
+            audioElement.volume = targetVolume;
+            clearInterval(fadeInterval);
+            fadeInterval = null;
+        }
+    }, tickTime);
+}
 
 // ========================================
 // UTILIDADES
@@ -275,6 +306,21 @@ async function initMediaPipe() {
         // Actualizar estado
         $('#status-text').textContent = 'Cámara activa - Acércate al espejo';
 
+        // Iniciar música de fondo suavemente
+        const bgMusic = $('#bg-music');
+        if (bgMusic) {
+            bgMusic.volume = 0.15;
+            bgMusic.play().catch(e => console.log('Autoplay bloqueado. La música iniciará al toque de pantalla.'));
+            
+            // Por si el navegador bloqueó el autoplay, iniciar al primer click
+            document.body.addEventListener('click', () => {
+                if (bgMusic.paused) {
+                    bgMusic.volume = 0.15;
+                    bgMusic.play();
+                }
+            }, { once: true });
+        }
+
     } catch (error) {
         console.error('❌ Error al iniciar cámara:', error);
         $('#status-text').textContent = 'Error de cámara - Recarga la página';
@@ -407,10 +453,14 @@ function detectarPersonaCompleta(landmarks) {
 function onPersonaDetectada(detectada) {
     const pulse = $('.pulse');
     const statusText = $('#status-text');
+    const bgMusic = $('#bg-music');
 
     if (detectada) {
         pulse.classList.add('detected');
         statusText.textContent = '¡Persona detectada!';
+        
+        // Sube volumen levemente
+        if (bgMusic && !bgMusic.paused) fadeAudio(bgMusic, 0.4, 2000);
 
         // Mostrar textos flotantes en fase espejo
         if (State.faseActual === 'espejo') {
@@ -425,6 +475,9 @@ function onPersonaDetectada(detectada) {
     } else {
         pulse.classList.remove('detected');
         statusText.textContent = 'Acércate al espejo...';
+
+        // Baja volumen de nuevo a suave
+        if (bgMusic && !bgMusic.paused) fadeAudio(bgMusic, 0.15, 2000);
 
         if (State.faseActual === 'espejo') {
             hideElement('#textos-flotantes');
@@ -840,19 +893,52 @@ function detectarGestos(landmarks) {
     const shoulderY = (leftShoulder.y + rightShoulder.y) / 2;
     const shoulderX = (leftShoulder.x + rightShoulder.x) / 2;
 
-    // Gesto: Brazo derecho en arco (siguiente traje)
+    // EVALUAR GESTO DE DESPEDIDA (Agitar mano arriba, sea izquierda o derecha)
+    // MediaPipe Y: 0 es el tope superior, 1 es abajo.
+    const isWavingRight = rightWrist.y < rightShoulder.y - 0.1;
+    const isWavingLeft = leftWrist.y < leftShoulder.y - 0.1;
+
+    if (isWavingRight || isWavingLeft) {
+        // Usamos la muñeca que esté más alta
+        const wavingWrist = (rightWrist.y < leftWrist.y) ? rightWrist : leftWrist;
+        
+        State.historialDespedida.push(wavingWrist.x);
+        if (State.historialDespedida.length > 20) {
+            State.historialDespedida.shift();
+            
+            const maxX = Math.max(...State.historialDespedida);
+            const minX = Math.min(...State.historialDespedida);
+            
+            // Si se movió rápido en horizontal (despedida / chao)
+            if (maxX - minX > 0.18) {
+                console.log("👋 Gesto de despedida detectado");
+                showGestureIndicator('👋');
+                State.gestoCooldown = true;
+                State.historialDespedida = [];
+                
+                setTimeout(() => {
+                    resetearExperiencia();
+                }, 1000);
+                return;
+            }
+        }
+    } else {
+        State.historialDespedida = []; // Reiniciar si bajan los brazos
+    }
+
+    // Gesto: Brazo derecho extendido (siguiente traje)
     // Muñeca derecha está arriba y a la derecha del hombro
-    const rightArmUp = rightWrist.y < shoulderY - 0.1;
-    const rightArmRight = rightWrist.x > rightShoulder.x + 0.1;
+    const rightArmUp = rightWrist.y < shoulderY;
+    const rightArmRight = rightWrist.x > rightShoulder.x + 0.15; // Extendida bastante a la derecha
 
     if (rightArmUp && rightArmRight) {
         cambiarTraje('siguiente');
         return;
     }
 
-    // Gesto: Brazo izquierdo en arco (traje anterior)
-    const leftArmUp = leftWrist.y < shoulderY - 0.1;
-    const leftArmLeft = leftWrist.x < leftShoulder.x - 0.1;
+    // Gesto: Brazo izquierdo extendido (traje anterior)
+    const leftArmUp = leftWrist.y < shoulderY;
+    const leftArmLeft = leftWrist.x < leftShoulder.x - 0.15;
 
     if (leftArmUp && leftArmLeft) {
         cambiarTraje('anterior');
@@ -961,13 +1047,13 @@ async function tomarFotoRecuerdo() {
     ctx.textAlign = 'center';
     
     ctx.font = 'bold 28px Georgia';
-    ctx.fillText('Museo de Trajes de Bogotá', canvasRecuerdo.width / 2, canvasRecuerdo.height - 120);
+    ctx.fillText('El Hilo que Nos Conecta', canvasRecuerdo.width / 2, canvasRecuerdo.height - 120);
     
     ctx.font = 'italic 20px Georgia';
-    ctx.fillText('El Hilo que Nos Conecta', canvasRecuerdo.width / 2, canvasRecuerdo.height - 90);
+    ctx.fillText('Museo de Trajes de Bogotá', canvasRecuerdo.width / 2, canvasRecuerdo.height - 90);
 
     ctx.font = '18px Arial';
-    ctx.fillText('Si quieres saber más, visita el museo en:', canvasRecuerdo.width / 2, canvasRecuerdo.height - 60);
+    ctx.fillText('Conoce y pruébate más trajes en nuestro museo:', canvasRecuerdo.width / 2, canvasRecuerdo.height - 60);
     
     ctx.font = 'bold 20px Arial';
     ctx.fillText('Calle 10 # 6-26, Bogotá', canvasRecuerdo.width / 2, canvasRecuerdo.height - 35);

@@ -446,43 +446,37 @@ html, body {
 /* Gestos hint */
 .gestos-hint {
     position: absolute;
-    top: 15px;
-    left: 50%;
-    transform: translateX(-50%);
+    top: 0;
+    left: 0;
+    width: 100%;
     display: flex;
     flex-direction: row;
-    gap: 10px;
-    z-index: 5;
-    flex-wrap: nowrap;
-    justify-content: center;
-    background: transparent;
-    padding: 0;
-    width: 95%;
-    max-width: 600px;
+    justify-content: space-around;
+    padding: 15px 5px 30px 5px; /* Más padding abajo por la transición suave */
+    background: linear-gradient(to bottom, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0) 100%);
+    z-index: 10;
 }
 
 .gesto {
     display: flex;
-    flex-direction: column;
+    flex-direction: row; /* Icono a la izquierda, texto a la derecha */
     align-items: center;
     justify-content: center;
-    gap: 4px;
-    font-size: 0.75rem;
-    line-height: 1.2;
-    text-align: center;
+    gap: 8px;
+    font-size: 0.8rem;
+    line-height: 1.1;
+    text-align: left;
     font-weight: bold;
     color: #fff;
-    text-shadow: 1px 1px 4px rgba(0,0,0,0.9);
-    background: rgba(0, 0, 0, 0.45);
-    padding: 8px;
-    border-radius: 12px;
-    backdrop-filter: blur(4px);
-    flex: 1;
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    text-shadow: 1px 1px 4px rgba(0,0,0,1);
+    background: transparent;
+    padding: 0;
+    border: none;
+    backdrop-filter: none;
 }
 
 .gesto-icon {
-    font-size: 1.4rem;
+    font-size: 1.6rem;
 }
 
 /* Contador de trajes */
