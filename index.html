@@ -126,15 +126,15 @@
             <div id="gestos-hint" class="gestos-hint">
                 <div class="gesto">
                     <span class="gesto-icon">👈</span>
-                    <span>Brazo izquierdo → Anterior</span>
-                </div>
-                <div class="gesto">
-                    <span class="gesto-icon">👉</span>
-                    <span>Brazo derecho → Siguiente</span>
+                    <span>Brazo Izquierdo<br>Anterior</span>
                 </div>
                 <div class="gesto">
                     <span class="gesto-icon">📸</span>
-                    <span>Dos manos arriba → Foto</span>
+                    <span>Dos Manos<br>Tomar Foto</span>
+                </div>
+                <div class="gesto">
+                    <span class="gesto-icon">👉</span>
+                    <span>Brazo Derecho<br>Siguiente</span>
                 </div>
             </div>
 
@@ -151,13 +151,17 @@
     <!-- Modal para foto/recuerdo -->
     <div id="modal-foto" class="modal hidden">
         <div class="modal-content">
-            <h3>¡Tu recuerdo del museo!</h3>
+            <h3 class="modal-title">¡Llévate este momento!</h3>
             <canvas id="canvas-recuerdo"></canvas>
             
             <div id="qr-section">
-                <p id="qr-loading">⏳ Subiendo foto para escanear...</p>
-                <div id="qr-container"></div>
-                <p id="qr-instructions" class="hidden">¡Escanea con tu celular para descargar la foto!</p>
+                <p id="qr-loading">⏳ Guardando tu recuerdo en la historia...</p>
+                <div id="qr-container" class="qr-decorated"></div>
+                <div id="qr-instructions" class="hidden">
+                    <p class="qr-text-main">Descarga tu recuerdo de</p>
+                    <p class="qr-text-highlight">"El Hilo que Nos Conecta"</p>
+                    <p class="qr-text-sub">Escanea este código con tu celular</p>
+                </div>
             </div>
 
             <div class="modal-buttons">

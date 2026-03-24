@@ -446,34 +446,43 @@ html, body {
 /* Gestos hint */
 .gestos-hint {
     position: absolute;
-    top: 70px;
+    top: 15px;
     left: 50%;
     transform: translateX(-50%);
     display: flex;
-    gap: 15px;
+    flex-direction: row;
+    gap: 10px;
     z-index: 5;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     justify-content: center;
     background: transparent;
     padding: 0;
+    width: 95%;
+    max-width: 600px;
 }
 
 .gesto {
     display: flex;
+    flex-direction: column;
     align-items: center;
-    gap: 8px;
-    font-size: 0.95rem;
+    justify-content: center;
+    gap: 4px;
+    font-size: 0.75rem;
+    line-height: 1.2;
+    text-align: center;
     font-weight: bold;
     color: #fff;
-    text-shadow: 2px 2px 6px rgba(0,0,0,0.9), 0 0 15px rgba(0,0,0,0.8);
-    background: rgba(0, 0, 0, 0.25);
-    padding: 6px 12px;
+    text-shadow: 1px 1px 4px rgba(0,0,0,0.9);
+    background: rgba(0, 0, 0, 0.45);
+    padding: 8px;
     border-radius: 12px;
-    backdrop-filter: blur(2px);
+    backdrop-filter: blur(4px);
+    flex: 1;
+    border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .gesto-icon {
-    font-size: 1.2rem;
+    font-size: 1.4rem;
 }
 
 /* Contador de trajes */
@@ -533,44 +542,62 @@ html, body {
 }
 
 .modal-content {
-    background: linear-gradient(135deg, #2c1810 0%, #1a1a2e 100%);
-    padding: 30px;
-    border-radius: var(--radio-borde);
-    max-width: 90%;
-    max-height: 90%;
+    background: linear-gradient(135deg, #1a1a2e 0%, #0f3460 100%);
+    padding: 20px;
+    border-radius: 20px;
+    max-width: 95%;
+    max-height: 95vh;
+    overflow-y: auto;
     text-align: center;
     border: 2px solid var(--color-accent);
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.8);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
 }
 
-.modal-content h3 {
+.modal-title {
     font-family: var(--fuente-titulo);
     color: var(--color-accent);
-    margin-bottom: 20px;
-    font-size: 1.5rem;
+    margin-bottom: 15px;
+    font-size: 1.8rem;
+    text-shadow: 0 2px 4px rgba(0,0,0,0.5);
 }
 
 #canvas-recuerdo {
     max-width: 100%;
-    max-height: 50vh;
-    border-radius: var(--radio-borde);
-    margin-bottom: 20px;
+    max-height: 40vh;
+    border-radius: 12px;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+    margin-bottom: 15px;
 }
 
 #qr-section {
     display: flex;
     flex-direction: column;
     align-items: center;
-    margin-bottom: 25px;
-    min-height: 150px;
-    justify-content: center;
+    margin-bottom: 20px;
+    width: 100%;
+    background: rgba(0,0,0,0.3);
+    border-radius: 15px;
+    padding: 15px;
+    border: 1px dashed rgba(212, 165, 116, 0.4);
 }
 
-#qr-container {
+.qr-decorated {
     background: white;
     padding: 10px;
     border-radius: 10px;
+    box-shadow: 0 0 20px rgba(255,255,255,0.2);
     margin: 10px 0;
-    display: none; /* Se muestra al cargar */
+    display: none;
+}
+
+/* Modificamos el canvas/img que genera qrcode.js para que no desborde */
+.qr-decorated img, .qr-decorated canvas {
+    margin: 0 auto;
+    max-width: 130px;
+    max-height: 130px;
 }
 
 #qr-loading {
@@ -580,9 +607,26 @@ html, body {
 }
 
 #qr-instructions {
-    color: #fff;
-    font-size: 1rem;
-    font-weight: bold;
+    margin-top: 10px;
+}
+
+.qr-text-main {
+    color: #e0e0e0;
+    font-size: 0.95rem;
+    margin-bottom: 3px;
+}
+
+.qr-text-highlight {
+    color: var(--color-accent);
+    font-family: var(--fuente-titulo);
+    font-size: 1.3rem;
+    font-style: italic;
+    margin-bottom: 5px;
+}
+
+.qr-text-sub {
+    color: #a0a0a0;
+    font-size: 0.8rem;
 }
 
 .modal-buttons {
