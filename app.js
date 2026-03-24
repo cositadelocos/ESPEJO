@@ -1,0 +1,780 @@
+/**
+ * EL HILO QUE NOS CONECTA
+ * Museo de Trajes de Bogotá - Simulador de Espejo Interactivo
+ *
+ * Funcionalidades:
+ * - MediaPipe para detección de cuerpo y gestos
+ * - Face-api.js para detección de rostro
+ * - Fotomontaje con Canvas API
+ * - Navegación por gestos
+ * - Datos curiosos animados
+ */
+
+// ========================================
+// CONFIGURACIÓN Y ESTADO GLOBAL
+// ========================================
+
+const CONFIG = {
+    // URLs de modelos de MediaPipe
+    modelUrl: 'https://cdn.jsdelivr.net/npm/@mediapipe/pose/',
+    holisticModelUrl: 'https://cdn.jsdelivr.net/npm/@mediapipe/holistic/',
+
+    // Configuración de cámara
+    videoWidth: 640,
+    videoHeight: 480,
+
+    // Umbrales para gestos
+    gestureThreshold: 0.3,      // Sensibilidad de gestos
+    detectionConfidence: 0.5,   // Confianza mínima de detección
+    personDetectionThreshold: 0.3,
+
+    // Timing
+    countdownDuration: 3000,    // 3 segundos para contador
+    textAnimationInterval: 4000,
+    dataCuriousInterval: 6000,
+
+    // Rutas de trajes
+    trajes: [
+        {
+            id: 'frac',
+            nombre: 'Frac (Influencia Europea)',
+            archivo: 'frak.png',
+            region: 'Bogotá / Andes',
+            anio: '1850–1950',
+            datosCuriosos: [
+                'Se usaba exclusivamente para eventos de gala',
+                'Mientras los sastres cortaban, las mujeres debían coser sus prendas íntimas por pudor de la época'
+            ],
+            promptIA: `Atuendo masculino formal de etiqueta completa, estilo frac de influencia europea (mediados s. XIX - principios s. XX). Chaqueta de frac de lana negra de alta calidad con solapas de pico anchas, cuerpo frontal corto y colas traseras en picos simétricos. Chaleco de piqué de algodón blanco texturizado. Camisa blanca de algodón con cuello de pajarita rígido. Pantalón de vestir recto con raya diplomática fina en gris oscuro y negro. Corbatín de seda negra. Ajuste formal y elegante.`
+        },
+        {
+            id: 'misak',
+            nombre: 'Misak – Guambiano',
+            archivo: 'misak.png',
+            region: 'Cauca',
+            anio: 'Actualidad',
+            datosCuriosos: [
+                'No es ropa comprada — cada pieza fue tejida por la propia comunidad',
+                'Sus creadores escribieron su historia en la serie "Hilando Memoria"'
+            ],
+            promptIA: `Atuendo femenino tradicional de la comunidad indígena Misak (Guambiano). Anaco de lana blanca con líneas horizontales azules y fucsia. Chumbe tejido a mano con diseños geométricos en azul, fucsia, verde y blanco. Rebozo de lana fucsia intenso que cubre hombros. Sombrero de fibra natural con pompones blancos, negros y fucsia. Collares de cuentas blancas densos. Botas de cuero. Texturas artesanales rústicas.`
+        },
+        {
+            id: 'vestido',
+            nombre: 'Mujer de San Andrés',
+            archivo: 'vestido.png',
+            region: 'Islas / Caribe',
+            anio: '1850–1950',
+            datosCuriosos: [
+                'Refleja un mestizaje afro-europeo único en Colombia',
+                'Es de uso obligatorio en ritos religiosos — el vestido dicta el estatus en la isla'
+            ],
+            promptIA: `Vestido femenino tradicional de gala de San Andrés, Región Insular colombiana. Vestido de una pieza en algodón blanco con rayas verticales verdes claras y lunares verdes. Mangas cortas abullonadas con gran volante doble cruzado en V sobre pecho y hombros, ribete verde esmeralda oscuro. Botonadura central de botones verdes. Falda larga con panel inferior de encaje verde claro translúcido con patrones florales y festoneado. Silueta elegante colonial caribeña.`
+        },
+        {
+            id: 'campesino',
+            nombre: 'Campesino de Boyacá',
+            archivo: 'Campesino.png',
+            region: 'Boyacá / Andes',
+            anio: '1850–1950',
+            datosCuriosos: [
+                'Aparece en los registros de la Comisión Corográfica de 1850',
+                'Fue diseñado para sobrevivir al frío extremo de los Andes'
+            ],
+            promptIA: `Atuendo masculino tradicional campesino de Boyacá, Andes colombianos. Ruana cuadrada grande de lana virgen color crudo/hueso con textura áspera, densa y pesada, flecos cortos en borde inferior, cuello en V con cordón. Camisa blanca de algodón bajo la ruana. Pantalón de vestir recto color chocolate oscuro en paño de lana mate. Sombrero de paja color ocre claro con cinta negra. Pañolón de lana blanca con puntos calados cubriendo cuello y mandíbula. Alpargatas de fique crudo. Aspecto rústico andino.`
+        },
+        {
+            id: 'barequera',
+            nombre: 'Barequera del Río Guadalupe',
+            archivo: 'barequera.png',
+            region: 'Antioquia',
+            anio: '1850–1950',
+            datosCuriosos: [
+                'El traje de las mineras de oro del río',
+                'Su joya más preciada no era el oro, sino la batea de madera para separar el metal de la arena'
+            ],
+            promptIA: `Atuendo femenino tradicional de trabajo para minería de oro en ríos de Antioquia. Blusa de algodón ligero sin mangas, cuello redondo cerrado, color blanco puro, entallada en torso. Falda negra de tiro alto en algodón mate o lino, fruncida densamente en cintura, volumen de pliegues naturales que caen hasta debajo de rodillas, textura rugosa resistente. Pañuelo de cabeza triangular de algodón rojo escarlata vibrante cubriendo cabeza. Sombrero de fibra natural de ala ancha con cinta negra. Alpargatas de fique crudo. Contraste blanco-negro-rojo intenso.`
+        }
+    ]
+};
+
+// Estado global de la aplicación
+const State = {
+    faseActual: 'espejo',       // 'espejo', 'preparacion', 'traje'
+    trajeActual: 0,             // Índice del traje actual
+    trajeSeleccionado: null,    // Traje seleccionado inicialmente
+    fotoCapturada: null,        // DataURL de la foto
+    rostroDetectado: null,      // Datos del rostro detectado
+    cuerpoDetectado: false,     // Hay cuerpo completo en frame
+    contadorActivo: false,      // Contador corriendo
+    gestoCooldown: false,       // Cooldown entre gestos
+    datosCuriososInterval: null,
+    camera: null,
+    pose: null,
+    holistic: null,
+    videoElement: null,
+    canvasElement: null,
+    ctx: null
+};
+
+// ========================================
+// UTILIDADES
+// ========================================
+
+function $(selector) { return document.querySelector(selector); }
+function $$(selector) { return document.querySelectorAll(selector); }
+
+function showElement(el) {
+    if (typeof el === 'string') el = $(el);
+    if (el) el.classList.remove('hidden');
+}
+
+function hideElement(el) {
+    if (typeof el === 'string') el = $(el);
+    if (el) el.classList.add('hidden');
+}
+
+function cambiarFase(nuevaFase) {
+    // Ocultar todas las fases
+    $$('.fase').forEach(fase => fase.classList.remove('active'));
+
+    // Mostrar nueva fase
+    const faseEl = $(`#fase-${nuevaFase}`);
+    if (faseEl) {
+        faseEl.classList.add('active');
+        State.faseActual = nuevaFase;
+    }
+}
+
+function createFlash() {
+    const flash = document.createElement('div');
+    flash.className = 'flash';
+    document.body.appendChild(flash);
+    setTimeout(() => flash.remove(), 300);
+}
+
+function showGestureIndicator(emoji) {
+    const indicator = document.createElement('div');
+    indicator.className = 'gesto-detectado';
+    indicator.textContent = emoji;
+    document.body.appendChild(indicator);
+    setTimeout(() => indicator.remove(), 500);
+}
+
+// ========================================
+// INICIALIZACIÓN
+// ========================================
+
+document.addEventListener('DOMContentLoaded', () => {
+    console.log('🎭 El Hilo que Nos Conecta - Iniciando...');
+
+    // Verificar recursos
+    checkResources();
+
+    // Inicializar event listeners
+    initEventListeners();
+
+    // Inicializar MediaPipe y cámara
+    initMediaPipe();
+});
+
+function checkResources() {
+    console.log('📦 Verificando recursos de trajes...');
+    CONFIG.trajes.forEach(traje => {
+        const img = new Image();
+        img.onload = () => console.log(`✅ ${traje.archivo} cargado`);
+        img.onerror = () => console.error(`❌ Error cargando ${traje.archivo}`);
+        img.src = traje.archivo;
+    });
+}
+
+function initEventListeners() {
+    // Botones de telas
+    $$('.btn-tela').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const tela = btn.dataset.tela;
+            const trajeId = btn.dataset.traje;
+            console.log(`🧵 Tela seleccionada: ${tela}, Traje: ${trajeId}`);
+
+            // Encontrar índice del traje
+            const trajeIndex = CONFIG.trajes.findIndex(t => t.id === trajeId);
+            if (trajeIndex !== -1) {
+                State.trajeSeleccionado = trajeIndex;
+                State.trajeActual = trajeIndex;
+                iniciarFasePreparacion();
+            }
+        });
+    });
+
+    // Botón volver
+    $('#btn-volver').addEventListener('click', () => {
+        resetearExperiencia();
+    });
+
+    // Botones del modal
+    $('#btn-descargar').addEventListener('click', descargarRecuerdo);
+    $('#btn-cerrar-modal').addEventListener('click', () => {
+        hideElement('#modal-foto');
+    });
+}
+
+// ========================================
+// MEDIAPIPE - INICIALIZACIÓN
+// ========================================
+
+async function initMediaPipe() {
+    console.log('🎥 Inicializando MediaPipe...');
+
+    // Configurar elementos de video
+    State.videoElement = $('#input-video');
+    State.canvasElement = $('#output-canvas');
+    State.ctx = State.canvasElement.getContext('2d');
+
+    // Configurar canvas
+    State.canvasElement.width = CONFIG.videoWidth;
+    State.canvasElement.height = CONFIG.videoHeight;
+
+    // Inicializar Pose
+    State.pose = new Pose({
+        locateFile: (file) => {
+            return `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`;
+        }
+    });
+
+    State.pose.setOptions({
+        modelComplexity: 1,
+        smoothLandmarks: true,
+        enableSegmentation: false,
+        minDetectionConfidence: CONFIG.detectionConfidence,
+        minTrackingConfidence: CONFIG.detectionConfidence
+    });
+
+    State.pose.onResults(onPoseResults);
+
+    // Inicializar cámara
+    try {
+        State.camera = new Camera(State.videoElement, {
+            onFrame: async () => {
+                if (State.faseActual === 'espejo' || State.faseActual === 'preparacion') {
+                    await State.pose.send({ image: State.videoElement });
+                }
+            },
+            width: CONFIG.videoWidth,
+            height: CONFIG.videoHeight
+        });
+
+        await State.camera.start();
+        console.log('✅ Cámara iniciada');
+
+        // Actualizar estado
+        $('#status-text').textContent = 'Cámara activa - Acércate al espejo';
+
+    } catch (error) {
+        console.error('❌ Error al iniciar cámara:', error);
+        $('#status-text').textContent = 'Error de cámara - Recarga la página';
+    }
+}
+
+// ========================================
+// MEDIAPIPE - RESULTADOS
+// ========================================
+
+function onPoseResults(results) {
+    // Limpiar canvas
+    State.ctx.clearRect(0, 0, State.canvasElement.width, State.canvasElement.height);
+
+    if (results.poseLandmarks) {
+        // Dibujar landmarks (opcional, para debug)
+        // drawConnectors(State.ctx, results.poseLandmarks, POSE_CONNECTIONS,
+        //     { color: '#00FF00', lineWidth: 2 });
+        // drawLandmarks(State.ctx, results.poseLandmarks,
+        //     { color: '#FF0000', lineWidth: 1, radius: 3 });
+
+        // Verificar si hay persona completa
+        const personaDetectada = detectarPersonaCompleta(results.poseLandmarks);
+
+        if (personaDetectada !== State.cuerpoDetectado) {
+            State.cuerpoDetectado = personaDetectada;
+            onPersonaDetectada(personaDetectada);
+        }
+
+        // Si estamos en fase traje, detectar gestos
+        if (State.faseActual === 'traje' && !State.gestoCooldown) {
+            detectarGestos(results.poseLandmarks);
+        }
+    } else {
+        if (State.cuerpoDetectado) {
+            State.cuerpoDetectado = false;
+            onPersonaDetectada(false);
+        }
+    }
+}
+
+function detectarPersonaCompleta(landmarks) {
+    // Verificar puntos clave del cuerpo
+    const puntosClave = [
+        0,   // Nariz
+        11,  // Hombro izquierdo
+        12,  // Hombro derecho
+        23,  // Cadera izquierda
+        24,  // Cadera derecha
+        27,  // Tobillo izquierdo
+        28   // Tobillo derecho
+    ];
+
+    let puntosVisibles = 0;
+    puntosClave.forEach(idx => {
+        if (landmarks[idx] && landmarks[idx].visibility > CONFIG.personDetectionThreshold) {
+            puntosVisibles++;
+        }
+    });
+
+    // Necesitamos al menos 5 de 7 puntos
+    return puntosVisibles >= 5;
+}
+
+function onPersonaDetectada(detectada) {
+    const pulse = $('.pulse');
+    const statusText = $('#status-text');
+
+    if (detectada) {
+        pulse.classList.add('detected');
+        statusText.textContent = '¡Persona detectada!';
+
+        // Mostrar textos flotantes en fase espejo
+        if (State.faseActual === 'espejo') {
+            showElement('#textos-flotantes');
+            showElement('#botones-telas');
+        }
+
+        // En fase preparación, verificar si iniciar contador
+        if (State.faseActual === 'preparacion' && !State.contadorActivo) {
+            iniciarContador();
+        }
+    } else {
+        pulse.classList.remove('detected');
+        statusText.textContent = 'Acércate al espejo...';
+
+        if (State.faseActual === 'espejo') {
+            hideElement('#textos-flotantes');
+            hideElement('#botones-telas');
+        }
+    }
+}
+
+// ========================================
+// FASE PREPARACIÓN
+// ========================================
+
+function iniciarFasePreparacion() {
+    console.log('🎯 Iniciando fase de preparación');
+    cambiarFase('preparacion');
+
+    // Configurar video de preparación
+    const prepVideo = $('#prep-video');
+    const stream = State.videoElement.srcObject;
+    if (stream) {
+        prepVideo.srcObject = stream;
+    }
+
+    // Reiniciar estado
+    State.contadorActivo = false;
+    hideElement('#contador-container');
+    showElement('#guia-cuerpo');
+    showElement('#anuncios-prep');
+}
+
+function iniciarContador() {
+    if (State.contadorActivo) return;
+
+    console.log('⏱️ Iniciando contador');
+    State.contadorActivo = true;
+
+    hideElement('#guia-cuerpo');
+    hideElement('#anuncios-prep');
+    showElement('#contador-container');
+
+    let cuenta = 3;
+    const contadorEl = $('#contador');
+    contadorEl.textContent = cuenta;
+
+    const interval = setInterval(() => {
+        cuenta--;
+
+        if (cuenta > 0) {
+            contadorEl.textContent = cuenta;
+            // Reiniciar animación
+            contadorEl.style.animation = 'none';
+            contadorEl.offsetHeight; // Trigger reflow
+            contadorEl.style.animation = 'contador-pulse 1s ease-in-out';
+        } else {
+            clearInterval(interval);
+            contadorEl.textContent = '¡Listo!';
+            setTimeout(capturarFoto, 500);
+        }
+    }, 1000);
+}
+
+// ========================================
+// CAPTURA DE FOTO
+// ========================================
+
+function capturarFoto() {
+    console.log('📸 Capturando foto...');
+
+    createFlash();
+
+    // Crear canvas temporal para la captura
+    const canvas = document.createElement('canvas');
+    canvas.width = State.videoElement.videoWidth || CONFIG.videoWidth;
+    canvas.height = State.videoElement.videoHeight || CONFIG.videoHeight;
+    const ctx = canvas.getContext('2d');
+
+    // Dibujar frame actual del video (invertido para modo espejo)
+    ctx.translate(canvas.width, 0);
+    ctx.scale(-1, 1);
+    ctx.drawImage(State.videoElement, 0, 0, canvas.width, canvas.height);
+
+    // Guardar foto
+    State.fotoCapturada = canvas.toDataURL('image/jpeg', 0.9);
+
+    // Mostrar en imagen oculta
+    $('#img-capturada').src = State.fotoCapturada;
+
+    console.log('✅ Foto capturada');
+
+    // Procesar con IA
+    procesarConIA();
+}
+
+// ========================================
+// PROCESAMIENTO CON IA (SIMULADO)
+// ========================================
+
+async function procesarConIA() {
+    console.log('🤖 Procesando con IA...');
+
+    // Mostrar loading
+    cambiarFase('traje');
+    showElement('#loading-ia');
+
+    // Cargar imagen del traje
+    const traje = CONFIG.trajes[State.trajeActual];
+    $('#img-traje').src = traje.archivo;
+
+    // Esperar a que la imagen cargue
+    await new Promise((resolve) => {
+        $('#img-traje').onload = resolve;
+        $('#img-capturada').onload = resolve;
+        setTimeout(resolve, 2000); // Mínimo 2 segundos de "procesamiento"
+    });
+
+    // Simular procesamiento IA
+    setTimeout(() => {
+        hideElement('#loading-ia');
+        generarFotomontaje();
+        iniciarExperienciaTraje();
+    }, 1500);
+}
+
+function generarFotomontaje() {
+    const traje = CONFIG.trajes[State.trajeActual];
+    const canvas = $('#traje-canvas');
+    const ctx = canvas.getContext('2d');
+
+    // Dimensiones del canvas
+    canvas.width = 800;
+    canvas.height = 1200;
+
+    // Limpiar canvas
+    ctx.fillStyle = '#1a1a2e';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Cargar imágenes
+    const imgTraje = new Image();
+    const imgPersona = new Image();
+
+    imgTraje.onload = () => {
+        imgPersona.onload = () => {
+            // Dibujar fondo degradado
+            const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+            gradient.addColorStop(0, '#2c1810');
+            gradient.addColorStop(0.5, '#1a1a2e');
+            gradient.addColorStop(1, '#16213e');
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Calcular dimensiones para centrar
+            const scale = Math.min(
+                canvas.width / imgPersona.width,
+                canvas.height / imgPersona.height
+            ) * 0.9;
+
+            const x = (canvas.width - imgPersona.width * scale) / 2;
+            const y = (canvas.height - imgPersona.height * scale) / 2;
+
+            // Dibujar persona primero
+            ctx.drawImage(
+                imgPersona,
+                x, y,
+                imgPersona.width * scale,
+                imgPersona.height * scale
+            );
+
+            // Dibujar traje superpuesto (con transparencia para efecto)
+            ctx.globalAlpha = 0.95;
+            ctx.drawImage(
+                imgTraje,
+                0, 0,
+                canvas.width,
+                canvas.height
+            );
+            ctx.globalAlpha = 1;
+
+            // Añadir borde decorativo
+            ctx.strokeStyle = '#d4a574';
+            ctx.lineWidth = 8;
+            ctx.strokeRect(20, 20, canvas.width - 40, canvas.height - 40);
+
+            // Añadir título
+            ctx.fillStyle = '#d4a574';
+            ctx.font = 'bold 24px Georgia';
+            ctx.textAlign = 'center';
+            ctx.fillText('Museo de Trajes de Bogotá', canvas.width / 2, 60);
+            ctx.font = 'italic 18px Georgia';
+            ctx.fillText(traje.nombre, canvas.width / 2, 90);
+        };
+        imgPersona.src = State.fotoCapturada;
+    };
+    imgTraje.src = traje.archivo;
+}
+
+// ========================================
+// EXPERIENCIA DEL TRAJE
+// ========================================
+
+function iniciarExperienciaTraje() {
+    console.log('👘 Iniciando experiencia del traje');
+
+    const traje = CONFIG.trajes[State.trajeActual];
+
+    // Actualizar información
+    $('#nombre-traje').textContent = traje.nombre;
+    $('#region-traje').textContent = traje.region;
+    $('#anio-traje').textContent = traje.anio;
+    $('#traje-actual').textContent = State.trajeActual + 1;
+
+    // Iniciar datos curiosos
+    iniciarDatosCuriosos(traje);
+
+    // Mostrar hints de gestos
+    setTimeout(() => {
+        $('#gestos-hint').style.opacity = '0';
+        setTimeout(() => hideElement('#gestos-hint'), 1000);
+    }, 5000);
+}
+
+function iniciarDatosCuriosos(traje) {
+    // Limpiar interval anterior
+    if (State.datosCuriososInterval) {
+        clearInterval(State.datosCuriososInterval);
+    }
+
+    let datoIndex = 0;
+    const dato1 = $('#dato-1');
+    const dato2 = $('#dato-2');
+
+    function mostrarSiguienteDato() {
+        const dato = traje.datosCuriosos[datoIndex % traje.datosCuriosos.length];
+
+        // Alternar entre los dos contenedores
+        if (datoIndex % 2 === 0) {
+            dato1.textContent = `¿Sabías que? ${dato}`;
+        } else {
+            dato2.textContent = `¿Sabías que? ${dato}`;
+        }
+
+        datoIndex++;
+    }
+
+    // Mostrar primer dato
+    mostrarSiguienteDato();
+
+    // Cambiar cada 8 segundos
+    State.datosCuriososInterval = setInterval(mostrarSiguienteDato, 8000);
+}
+
+// ========================================
+// DETECCIÓN DE GESTOS
+// ========================================
+
+function detectarGestos(landmarks) {
+    if (!landmarks) return;
+
+    // Obtener puntos clave
+    const leftWrist = landmarks[15];   // Muñeca izquierda
+    const rightWrist = landmarks[16];  // Muñeca derecha
+    const leftShoulder = landmarks[11];
+    const rightShoulder = landmarks[12];
+    const nose = landmarks[0];
+
+    if (!leftWrist || !rightWrist || !leftShoulder || !rightShoulder || !nose) return;
+
+    // Calcular posiciones relativas
+    const shoulderY = (leftShoulder.y + rightShoulder.y) / 2;
+    const shoulderX = (leftShoulder.x + rightShoulder.x) / 2;
+
+    // Gesto: Brazo derecho en arco (siguiente traje)
+    // Muñeca derecha está arriba y a la derecha del hombro
+    const rightArmUp = rightWrist.y < shoulderY - 0.1;
+    const rightArmRight = rightWrist.x > rightShoulder.x + 0.1;
+
+    if (rightArmUp && rightArmRight) {
+        cambiarTraje('siguiente');
+        return;
+    }
+
+    // Gesto: Brazo izquierdo en arco (traje anterior)
+    const leftArmUp = leftWrist.y < shoulderY - 0.1;
+    const leftArmLeft = leftWrist.x < leftShoulder.x - 0.1;
+
+    if (leftArmUp && leftArmLeft) {
+        cambiarTraje('anterior');
+        return;
+    }
+
+    // Gesto: Dos manos arriba (tomar foto)
+    const bothArmsUp = leftWrist.y < nose.y && rightWrist.y < nose.y;
+
+    if (bothArmsUp) {
+        tomarFotoRecuerdo();
+    }
+}
+
+function cambiarTraje(direccion) {
+    if (State.gestoCooldown) return;
+
+    State.gestoCooldown = true;
+
+    if (direccion === 'siguiente') {
+        State.trajeActual = (State.trajeActual + 1) % CONFIG.trajes.length;
+        showGestureIndicator('👉');
+    } else {
+        State.trajeActual = (State.trajeActual - 1 + CONFIG.trajes.length) % CONFIG.trajes.length;
+        showGestureIndicator('👈');
+    }
+
+    console.log(`🔄 Cambiando a traje ${State.trajeActual + 1}`);
+
+    // Regenerar fotomontaje con nueva imagen
+    showElement('#loading-ia');
+
+    setTimeout(() => {
+        hideElement('#loading-ia');
+        generarFotomontaje();
+        iniciarExperienciaTraje();
+    }, 1000);
+
+    // Cooldown de 1.5 segundos
+    setTimeout(() => {
+        State.gestoCooldown = false;
+    }, 1500);
+}
+
+function tomarFotoRecuerdo() {
+    if (State.gestoCooldown) return;
+
+    State.gestoCooldown = true;
+    showGestureIndicator('📸');
+
+    console.log('📸 Tomando foto de recuerdo');
+
+    // Crear canvas de recuerdo
+    const canvasOriginal = $('#traje-canvas');
+    const canvasRecuerdo = $('#canvas-recuerdo');
+    const ctx = canvasRecuerdo.getContext('2d');
+
+    // Configurar dimensiones
+    canvasRecuerdo.width = 800;
+    canvasRecuerdo.height = 1200;
+
+    // Dibujar imagen actual
+    ctx.drawImage(canvasOriginal, 0, 0, canvasRecuerdo.width, canvasRecuerdo.height);
+
+    // Añadir marca de agua del museo
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+    ctx.fillRect(20, canvasRecuerdo.height - 100, canvasRecuerdo.width - 40, 70);
+
+    ctx.fillStyle = '#2c1810';
+    ctx.font = 'bold 22px Georgia';
+    ctx.textAlign = 'center';
+    ctx.fillText('Museo de Trajes de Bogotá', canvasRecuerdo.width / 2, canvasRecuerdo.height - 60);
+    ctx.font = '16px Arial';
+    ctx.fillText('El Hilo que Nos Conecta', canvasRecuerdo.width / 2, canvasRecuerdo.height - 35);
+
+    // Mostrar modal
+    showElement('#modal-foto');
+
+    setTimeout(() => {
+        State.gestoCooldown = false;
+    }, 2000);
+}
+
+function descargarRecuerdo() {
+    const canvas = $('#canvas-recuerdo');
+    const link = document.createElement('a');
+    link.download = `recuerdo-museo-trajes-${Date.now()}.png`;
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+}
+
+// ========================================
+// RESETEAR EXPERIENCIA
+// ========================================
+
+function resetearExperiencia() {
+    console.log('🔄 Reseteando experiencia');
+
+    // Limpiar intervalos
+    if (State.datosCuriososInterval) {
+        clearInterval(State.datosCuriososInterval);
+    }
+
+    // Resetear estado
+    State.trajeActual = 0;
+    State.trajeSeleccionado = null;
+    State.fotoCapturada = null;
+    State.contadorActivo = false;
+    State.gestoCooldown = false;
+
+    // Volver a fase espejo
+    cambiarFase('espejo');
+
+    // Ocultar elementos
+    hideElement('#textos-flotantes');
+    hideElement('#botones-telas');
+    hideElement('#loading-ia');
+    hideElement('#modal-foto');
+
+    // Resetear UI
+    $('#status-text').textContent = 'Acércate al espejo...';
+    $('.pulse').classList.remove('detected');
+
+    console.log('✅ Experiencia reseteada');
+}
+
+// ========================================
+// UTILIDADES ADICIONALES
+// ========================================
+
+// Prevenir zoom en móviles
+document.addEventListener('gesturestart', (e) => e.preventDefault());
+document.addEventListener('gesturechange', (e) => e.preventDefault());
+document.addEventListener('gestureend', (e) => e.preventDefault());
+
+// Prevenir scroll
+window.addEventListener('scroll', (e) => {
+    window.scrollTo(0, 0);
+});
+
+console.log('✅ App.js cargado correctamente');

@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>El Hilo que Nos Conecta - Museo de Trajes de Bogotá</title>
+    <link rel="stylesheet" href="styles.css">
+    <!-- MediaPipe Dependencies -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/holistic/holistic.js" crossorigin="anonymous"></script>
+    <!-- Face API.js for face detection -->
+    <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
+</head>
+<body>
+    <!-- FASE 1: El Espejo -->
+    <div id="fase-espejo" class="fase active">
+        <div class="camera-container">
+            <video id="input-video" autoplay playsinline muted></video>
+            <canvas id="output-canvas"></canvas>
+
+            <!-- Overlay de textos flotantes -->
+            <div id="textos-flotantes" class="hidden">
+                <div class="texto-flotante" id="texto-1">¿Te atreves a viajar en el tiempo?</div>
+                <div class="texto-flotante" id="texto-2">Colombia te viste de siglos</div>
+                <div class="texto-flotante" id="texto-3">Toca una tela y descubre tu historia</div>
+            </div>
+
+            <!-- Indicador de detección -->
+            <div id="detection-status" class="detection-status">
+                <span class="pulse"></span>
+                <span id="status-text">Buscando persona...</span>
+            </div>
+        </div>
+
+        <!-- Botones de telas (FASE 1) -->
+        <div id="botones-telas" class="botones-telas hidden">
+            <button class="btn-tela" data-tela="algodon" data-traje="frac">
+                <div class="tela-preview" style="background: linear-gradient(135deg, #f5f5f5 0%, #e0e0e0 50%, #f0f0f0 100%);"></div>
+            </button>
+            <button class="btn-tela" data-tela="lana" data-traje="misak">
+                <div class="tela-preview" style="background: linear-gradient(135deg, #2c1810 0%, #4a3728 50%, #3d2820 100%);"></div>
+            </button>
+            <button class="btn-tela" data-tela="encaje" data-traje="vestido">
+                <div class="tela-preview" style="background: linear-gradient(135deg, #ffffff 0%, #f8f8f8 50%, #fff0f5 100%); border: 1px solid #ddd;"></div>
+            </button>
+        </div>
+    </div>
+
+    <!-- FASE 2: Preparación y Cuenta Regresiva -->
+    <div id="fase-preparacion" class="fase">
+        <div class="camera-container">
+            <video id="prep-video" autoplay playsinline muted></video>
+            <canvas id="prep-canvas"></canvas>
+
+            <!-- Anuncios de preparación -->
+            <div id="anuncios-prep" class="anuncios-prep">
+                <div class="anuncio active">¡Prepárate para ponerte un traje histórico!</div>
+                <div class="anuncio">Ubícate en el tapete rojo — necesitamos verte de cuerpo completo</div>
+                <div class="anuncio">Pies, manos, cabeza... ¡todo cuenta!</div>
+            </div>
+
+            <!-- Contador -->
+            <div id="contador-container" class="contador-container hidden">
+                <div id="contador">3</div>
+                <div class="contador-texto">Mira a la cámara</div>
+            </div>
+
+            <!-- Guía de cuerpo completo -->
+            <div id="guia-cuerpo" class="guia-cuerpo">
+                <div class="silueta-guia"></div>
+                <div class="instruccion-cuerpo">Alinea tu cuerpo dentro del marco</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- FASE 3: Visualización del Traje -->
+    <div id="fase-traje" class="fase">
+        <div class="traje-container">
+            <!-- Canvas para el fotomontaje -->
+            <canvas id="traje-canvas"></canvas>
+
+            <!-- Imagen del traje (oculta, usada para canvas) -->
+            <img id="img-traje" class="hidden" alt="Traje histórico">
+
+            <!-- Foto capturada (oculta, usada para canvas) -->
+            <img id="img-capturada" class="hidden" alt="Foto capturada">
+
+            <!-- Loading overlay -->
+            <div id="loading-ia" class="loading-ia hidden">
+                <div class="spinner"></div>
+                <div class="loading-text">La IA está vistiéndote...</div>
+                <div class="loading-subtext">Esto tomará unos segundos</div>
+            </div>
+
+            <!-- Datos curiosos flotantes -->
+            <div id="datos-curiosos" class="datos-curiosos">
+                <div class="dato-curioso" id="dato-1"></div>
+                <div class="dato-curioso" id="dato-2"></div>
+            </div>
+
+            <!-- Info del traje -->
+            <div id="info-traje" class="info-traje">
+                <h2 id="nombre-traje"></h2>
+                <div id="ubicacion-traje">
+                    <img src="assets/mapa-colombia.png" alt="Mapa de Colombia" id="mapa-colombia" class="hidden">
+                    <div class="pin-ubicacion"></div>
+                    <span id="region-traje"></span>
+                    <span id="anio-traje"></span>
+                </div>
+            </div>
+
+            <!-- Indicadores de gestos -->
+            <div id="gestos-hint" class="gestos-hint">
+                <div class="gesto">
+                    <span class="gesto-icon">👈</span>
+                    <span>Brazo izquierdo → Anterior</span>
+                </div>
+                <div class="gesto">
+                    <span class="gesto-icon">👉</span>
+                    <span>Brazo derecho → Siguiente</span>
+                </div>
+                <div class="gesto">
+                    <span class="gesto-icon">📸</span>
+                    <span>Dos manos arriba → Foto</span>
+                </div>
+            </div>
+
+            <!-- Contador de trajes -->
+            <div id="contador-trajes" class="contador-trajes">
+                <span id="traje-actual">1</span> / <span id="total-trajes">5</span>
+            </div>
+
+            <!-- Botón volver -->
+            <button id="btn-volver" class="btn-volver">↩ Volver al espejo</button>
+        </div>
+    </div>
+
+    <!-- Modal para foto/recuerdo -->
+    <div id="modal-foto" class="modal hidden">
+        <div class="modal-content">
+            <h3>¡Tu recuerdo del museo!</h3>
+            <canvas id="canvas-recuerdo"></canvas>
+            <div class="modal-buttons">
+                <button id="btn-descargar" class="btn-primario">📥 Descargar</button>
+                <button id="btn-cerrar-modal" class="btn-secundario">Cerrar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Audio feedback (opcional) -->
+    <audio id="audio-shutter" preload="auto">
+        <source src="data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=" type="audio/wav">
+    </audio>
+
+    <script src="app.js"></script>
+</body>
+</html>
