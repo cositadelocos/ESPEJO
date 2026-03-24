@@ -269,6 +269,14 @@ async function initMediaPipe() {
     State.canvasElement.width = CONFIG.videoWidth;
     State.canvasElement.height = CONFIG.videoHeight;
 
+    // Configurar overlay global de manos
+    State.overlayCanvas = $('#overlay-canvas');
+    if (State.overlayCanvas) {
+        State.overlayCtx = State.overlayCanvas.getContext('2d');
+        State.overlayCanvas.width = CONFIG.videoWidth;
+        State.overlayCanvas.height = CONFIG.videoHeight;
+    }
+
     // Inicializar Pose
     State.pose = new Pose({
         locateFile: (file) => {
@@ -375,15 +383,19 @@ async function segmentarPersona(imagen) {
 function onPoseResults(results) {
     // Limpiar canvas
     State.ctx.clearRect(0, 0, State.canvasElement.width, State.canvasElement.height);
+    
+    // Limpiar hilo de dibujo de manos
+    if (State.overlayCtx) {
+        State.overlayCtx.clearRect(0, 0, State.overlayCanvas.width, State.overlayCanvas.height);
+    }
 
     if (results.poseLandmarks) {
         State.ultimoLandmarks = results.poseLandmarks;
 
-        // Dibujar landmarks (opcional, para debug)
-        // drawConnectors(State.ctx, results.poseLandmarks, POSE_CONNECTIONS,
-        //     { color: '#00FF00', lineWidth: 2 });
-        // drawLandmarks(State.ctx, results.poseLandmarks,
-        //     { color: '#FF0000', lineWidth: 1, radius: 3 });
+        // Dibujar indicador visual de las manos
+        if (State.overlayCtx) {
+            drawHandTracking(results.poseLandmarks, State.overlayCtx, State.overlayCanvas.width, State.overlayCanvas.height);
+        }
 
         // Verificar si hay persona completa
         const personaDetectada = detectarPersonaCompleta(results.poseLandmarks);
@@ -434,13 +446,17 @@ function detectarPersonaCompleta(landmarks) {
             // En fase de preparación, requerimos estar centrados en la silueta (centro X cercano a 0.5)
             // MediaPipe: x=0 es izquierda, x=1 es derecha. La cámara está en espejo, pero MediaPipe da coordenadas en el frame.
             const hombroX = (hombroIzq.x + hombroDer.x) / 2;
+            const hombroY = (hombroIzq.y + hombroDer.y) / 2;
             
-            // Permitimos un margen en el centro (ej. entre 0.35 y 0.65)
-            if (hombroX < 0.35 || hombroX > 0.65) estaCentrado = false;
+            // Permitimos un margen en el centro, MÁS ESTRICTO ahora (ej. entre 0.40 y 0.60)
+            if (hombroX < 0.38 || hombroX > 0.62) estaCentrado = false;
 
-            // También evitamos estar demasiado cerca o demasiado lejos (anchura de hombros)
+            // Anchura de hombros estricta para asegurar distancia correcta
             const anchoHombros = Math.abs(hombroIzq.x - hombroDer.x);
-            if (anchoHombros < 0.15 || anchoHombros > 0.45) estaCentrado = false;
+            if (anchoHombros < 0.17 || anchoHombros > 0.38) estaCentrado = false;
+
+            // La altura de los hombros debe coincidir con la silueta (usualmente entre 0.25 y 0.50)
+            if (hombroY < 0.25 || hombroY > 0.50) estaCentrado = false;
         } else {
             estaCentrado = false;
         }
@@ -927,9 +943,10 @@ function detectarGestos(landmarks) {
     }
 
     // Gesto: Brazo derecho extendido (siguiente traje)
-    // Muñeca derecha está arriba y a la derecha del hombro
+    // En la imagen no reflejada (MediaPipe logic), el brazo derecho físico (16) está hacia la izquierda (x cercano a 0)
+    // Así que para alejarlo del cuerpo, debe tener un X MENOR al del hombro derecho.
     const rightArmUp = rightWrist.y < shoulderY;
-    const rightArmRight = rightWrist.x > rightShoulder.x + 0.15; // Extendida bastante a la derecha
+    const rightArmRight = rightWrist.x < rightShoulder.x - 0.18; // Extendida a la derecha del usuario
 
     if (rightArmUp && rightArmRight) {
         cambiarTraje('siguiente');
@@ -937,8 +954,9 @@ function detectarGestos(landmarks) {
     }
 
     // Gesto: Brazo izquierdo extendido (traje anterior)
+    // El brazo izquierdo físico (15) está hacia la derecha de la imagen no reflejada (x cercano a 1)
     const leftArmUp = leftWrist.y < shoulderY;
-    const leftArmLeft = leftWrist.x < leftShoulder.x - 0.15;
+    const leftArmLeft = leftWrist.x > leftShoulder.x + 0.18; // Extendida a la izquierda del usuario
 
     if (leftArmUp && leftArmLeft) {
         cambiarTraje('anterior');
@@ -1154,5 +1172,62 @@ document.addEventListener('gestureend', (e) => e.preventDefault());
 window.addEventListener('scroll', (e) => {
     window.scrollTo(0, 0);
 });
+
+// ========================================
+// TRACKING VISUAL (MANOS)
+// ========================================
+
+function drawHandTracking(landmarks, ctx, width, height) {
+    if (!ctx) return;
+
+    const p = (idx) => {
+        const lm = landmarks[idx];
+        if (!lm || lm.visibility < 0.5) return null;
+        return { x: lm.x * width, y: lm.y * height };
+    };
+
+    const drawLine = (p1, p2) => {
+        if (!p1 || !p2) return;
+        ctx.beginPath();
+        ctx.moveTo(p1.x, p1.y);
+        ctx.lineTo(p2.x, p2.y);
+        ctx.stroke();
+    };
+
+    const drawPoint = (pt, isWrist = false) => {
+        if (!pt) return;
+        ctx.beginPath();
+        ctx.arc(pt.x, pt.y, isWrist ? 10 : 5, 0, 2 * Math.PI);
+        ctx.fill();
+        ctx.stroke();
+    };
+
+    ctx.save();
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
+    ctx.fillStyle = 'rgba(212, 165, 116, 0.9)'; // Color de la marca del museo
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    // Obtener puntos principales de los brazos
+    const lShoulder = p(11), lElbow = p(13), lWrist = p(15);
+    const rShoulder = p(12), rElbow = p(14), rWrist = p(16);
+
+    // Índices de los dedos
+    const lPinky = p(17), lIndex = p(19), lThumb = p(21);
+    const rPinky = p(18), rIndex = p(20), rThumb = p(22);
+
+    // Dibujar Brazo Izquierdo (Físico)
+    drawLine(lShoulder, lElbow); drawLine(lElbow, lWrist);
+    drawLine(lWrist, lPinky); drawLine(lWrist, lIndex); drawLine(lWrist, lThumb);
+    drawPoint(lShoulder); drawPoint(lElbow); drawPoint(lWrist, true);
+
+    // Dibujar Brazo Derecho (Físico)
+    drawLine(rShoulder, rElbow); drawLine(rElbow, rWrist);
+    drawLine(rWrist, rPinky); drawLine(rWrist, rIndex); drawLine(rWrist, rThumb);
+    drawPoint(rShoulder); drawPoint(rElbow); drawPoint(rWrist, true);
+
+    ctx.restore();
+}
 
 console.log('✅ App.js cargado correctamente');

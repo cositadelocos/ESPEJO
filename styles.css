@@ -623,6 +623,20 @@ html, body {
     font-size: 0.8rem;
 }
 
+/* ========================================
+   OVERLAY DE MANOS
+   ======================================== */
+#overlay-canvas {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    object-fit: cover;
+    pointer-events: none;
+    z-index: 60;
+}
+
 .modal-buttons {
     display: flex;
     gap: 15px;
