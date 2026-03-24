@@ -398,8 +398,11 @@ function onPoseResults(results) {
     if (results.poseLandmarks) {
         State.ultimoLandmarks = results.poseLandmarks;
 
-        // Dibujar indicador visual de las manos
+        // Dibujar elementos interactivos de la pantalla
         if (State.overlayCtx && State.videoElement.videoWidth) {
+            if (State.faseActual === 'traje') {
+                updateAndDrawCloud(results.poseLandmarks, State.overlayCtx, State.overlayCanvas.width, State.overlayCanvas.height);
+            }
             drawHandTracking(results.poseLandmarks, State.overlayCtx, State.overlayCanvas.width, State.overlayCanvas.height);
         }
 
@@ -866,18 +869,21 @@ function iniciarExperienciaTraje() {
 }
 
 function iniciarDatosCuriosos(traje) {
-    // Limpiar interval anterior si existía (por compatibilidad)
-    if (State.datosCuriososInterval) {
-        clearInterval(State.datosCuriososInterval);
-        State.datosCuriososInterval = null;
-    }
-
-    const dato1 = $('#dato-1');
-    const dato2 = $('#dato-2');
-
-    // Rellenamos ambos contenedores. El CSS se encarga de alternarlos automáticamente (fade de 16 segundos)
-    dato1.textContent = `¿Sabías que? ${traje.datosCuriosos[0] || ''}`;
-    dato2.textContent = `¿Sabías que? ${traje.datosCuriosos[1] || ''}`;
+    if (!traje.datosCuriosos || traje.datosCuriosos.length === 0) return;
+    
+    // Configurar nube flotante e interactiva
+    State.nube = {
+        x: CONFIG.videoWidth ? CONFIG.videoWidth / 2 - 190 : 200,
+        y: 100,
+        width: 380,
+        height: 120,
+        vx: (Math.random() > 0.5 ? 1 : -1) * 1.8,
+        vy: (Math.random() > 0.5 ? 1 : -1) * 1.5,
+        textIndex: 0,
+        timer: 0,
+        texts: traje.datosCuriosos,
+        active: true
+    };
 }
 
 // ========================================
@@ -900,37 +906,23 @@ function detectarGestos(landmarks) {
     const shoulderY = (leftShoulder.y + rightShoulder.y) / 2;
     const shoulderX = (leftShoulder.x + rightShoulder.x) / 2;
 
-    // EVALUAR GESTO DE DESPEDIDA (Agitar mano arriba, sea izquierda o derecha)
-    // MediaPipe Y: 0 es el tope superior, 1 es abajo.
-    const isWavingRight = rightWrist.y < rightShoulder.y - 0.1;
-    const isWavingLeft = leftWrist.y < leftShoulder.y - 0.1;
-
-    if (isWavingRight || isWavingLeft) {
-        // Usamos la muñeca que esté más alta
-        const wavingWrist = (rightWrist.y < leftWrist.y) ? rightWrist : leftWrist;
+    // Gesto de Salida: APLAUSO (juntar las muñecas)
+    if (leftWrist.visibility > 0.4 && rightWrist.visibility > 0.4) {
+        const dx = leftWrist.x - rightWrist.x;
+        const dy = leftWrist.y - rightWrist.y;
+        const dist = Math.sqrt(dx*dx + dy*dy);
         
-        State.historialDespedida.push(wavingWrist.x);
-        if (State.historialDespedida.length > 20) {
-            State.historialDespedida.shift();
+        // Si las muñecas están muy juntas
+        if (dist < 0.09) {
+            console.log("👏 Aplauso detectado (Salir)");
+            showGestureIndicator('👏');
+            State.gestoCooldown = true;
             
-            const maxX = Math.max(...State.historialDespedida);
-            const minX = Math.min(...State.historialDespedida);
-            
-            // Si se movió rápido en horizontal (despedida / chao)
-            if (maxX - minX > 0.18) {
-                console.log("👋 Gesto de despedida detectado");
-                showGestureIndicator('👋');
-                State.gestoCooldown = true;
-                State.historialDespedida = [];
-                
-                setTimeout(() => {
-                    resetearExperiencia();
-                }, 1000);
-                return;
-            }
+            setTimeout(() => {
+                resetearExperiencia();
+            }, 1000);
+            return;
         }
-    } else {
-        State.historialDespedida = []; // Reiniciar si bajan los brazos
     }
 
     // Gesto: Brazo derecho extendido (siguiente traje)
@@ -1122,10 +1114,8 @@ function descargarRecuerdo() {
 function resetearExperiencia() {
     console.log('🔄 Reseteando experiencia');
 
-    // Limpiar intervalos
-    if (State.datosCuriososInterval) {
-        clearInterval(State.datosCuriososInterval);
-    }
+    // Desactivar nube
+    if (State.nube) State.nube.active = false;
 
     // Resetear estado
     State.trajeActual = 0;
@@ -1217,6 +1207,107 @@ function drawHandTracking(landmarks, ctx, width, height) {
     drawLine(rShoulder, rElbow); drawLine(rElbow, rWrist);
     drawLine(rWrist, rPinky); drawLine(rWrist, rIndex); drawLine(rWrist, rThumb);
     drawPoint(rShoulder); drawPoint(rElbow); drawPoint(rWrist, true);
+
+    ctx.restore();
+}
+
+function updateAndDrawCloud(landmarks, ctx, width, height) {
+    if (!State.nube || !State.nube.active) return;
+    const n = State.nube;
+
+    // Actualizar timer rotación texto
+    n.timer++;
+    if (n.timer > 300) { // ~10s
+        n.textIndex = (n.textIndex + 1) % n.texts.length;
+        n.timer = 0;
+    }
+
+    // Físicas básicas con limitador del canvas
+    n.x += n.vx;
+    n.y += n.vy;
+
+    if (n.x < 10) { n.x = 10; n.vx *= -1; }
+    if (n.x + n.width > width - 10) { n.x = width - n.width - 10; n.vx *= -1; }
+    if (n.y < 10) { n.y = 10; n.vy *= -1; }
+    // Dejar un margen debajo para no tapar los controles o info abajo
+    if (n.y + n.height > height * 0.75) { n.y = height * 0.75 - n.height; n.vy *= -1; }
+
+    // Interacción / Colisión con las manos
+    if (landmarks) {
+        const wrists = [landmarks[15], landmarks[16]];
+        wrists.forEach(w => {
+            if (w && w.visibility > 0.4) {
+                const wx = w.x * width;
+                const wy = w.y * height;
+                
+                const cnx = n.x + n.width/2;
+                const cny = n.y + n.height/2;
+                
+                const dx = cnx - wx;
+                const dy = cny - wy;
+                const dist = Math.sqrt(dx*dx + dy*dy);
+                
+                if (dist < 150) { // Empuje
+                    n.vx += (dx / dist) * 1.8;
+                    n.vy += (dy / dist) * 1.8;
+                }
+            }
+        });
+    }
+
+    // Fricción
+    const speed = Math.sqrt(n.vx*n.vx + n.vy*n.vy);
+    if (speed > 3) {
+        n.vx *= 0.95;
+        n.vy *= 0.95;
+    } else if (speed < 0.6) {
+        n.vx *= 1.05;
+        n.vy *= 1.05;
+    }
+
+    // --- Dibujo Visual de la Nube ---
+    ctx.save();
+    ctx.fillStyle = 'rgba(20, 20, 20, 0.8)';
+    ctx.strokeStyle = 'rgba(212, 165, 116, 0.8)';
+    ctx.lineWidth = 2;
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
+    ctx.shadowBlur = 10;
+
+    ctx.beginPath();
+    ctx.roundRect(n.x, n.y, n.width, n.height, 25);
+    ctx.fill();
+    ctx.stroke();
+
+    // Texto de la Nube
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = '#d4a574';
+    ctx.font = 'italic 18px Georgia';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('☁️ ¿Sabías que?', n.x + n.width/2, n.y + 25);
+
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 16px Arial';
+    
+    // Envoltura de texto
+    const text = n.texts[n.textIndex];
+    const words = text.split(' ');
+    let line = '';
+    let currentY = n.y + 55;
+    const maxWidth = n.width - 40;
+
+    for (let i = 0; i < words.length; i++) {
+        const testLine = line + words[i] + ' ';
+        const metrics = ctx.measureText(testLine);
+        if (metrics.width > maxWidth && i > 0) {
+            ctx.fillText(line, n.x + n.width/2, currentY);
+            line = words[i] + ' ';
+            currentY += 22;
+        } else {
+            line = testLine;
+        }
+    }
+    ctx.fillText(line, n.x + n.width/2, currentY);
 
     ctx.restore();
 }
