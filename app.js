@@ -400,6 +400,13 @@ function onPoseResults(results) {
 
         // Dibujar elementos interactivos de la pantalla
         if (State.overlayCtx && State.videoElement.videoWidth) {
+            
+            // Interactuar con botones virtuales
+            if (State.faseActual === 'espejo') {
+                checkVirtualButtonClicks(results.poseLandmarks, State.overlayCanvas);
+            }
+
+            // Nubes en traje
             if (State.faseActual === 'traje') {
                 updateAndDrawCloud(results.poseLandmarks, State.overlayCtx, State.overlayCanvas.width, State.overlayCanvas.height);
             }
@@ -871,18 +878,20 @@ function iniciarExperienciaTraje() {
 function iniciarDatosCuriosos(traje) {
     if (!traje.datosCuriosos || traje.datosCuriosos.length === 0) return;
     
-    // Configurar nube flotante e interactiva
     State.nube = {
-        x: CONFIG.videoWidth ? CONFIG.videoWidth / 2 - 190 : 200,
-        y: 100,
-        width: 380,
-        height: 120,
-        vx: (Math.random() > 0.5 ? 1 : -1) * 1.8,
-        vy: (Math.random() > 0.5 ? 1 : -1) * 1.5,
+        x: CONFIG.videoWidth ? CONFIG.videoWidth / 2 : 200,
+        y: 80,
+        width: 300,
+        height: 85,
+        vx: (Math.random() > 0.5 ? 1 : -1) * 1.5,
+        vy: (Math.random() > 0.5 ? 1 : -1) * 1.2,
         textIndex: 0,
-        timer: 0,
         texts: traje.datosCuriosos,
-        active: true
+        hits: 0,
+        cooldown: 0,
+        spawnTimer: 90, // ~3 segs retraso antes de salir la primera vez
+        active: true,
+        visible: false
     };
 }
 
@@ -1215,12 +1224,20 @@ function updateAndDrawCloud(landmarks, ctx, width, height) {
     if (!State.nube || !State.nube.active) return;
     const n = State.nube;
 
-    // Actualizar timer rotación texto
-    n.timer++;
-    if (n.timer > 300) { // ~10s
-        n.textIndex = (n.textIndex + 1) % n.texts.length;
-        n.timer = 0;
+    if (!n.visible) {
+        n.spawnTimer--;
+        if (n.spawnTimer <= 0) {
+            n.visible = true;
+            n.hits = 0;
+            n.vx = (Math.random() > 0.5 ? 1 : -1) * 1.5;
+            n.vy = (Math.random() > 0.5 ? 1 : -1) * 1.5;
+            n.x = width / 2 - n.width / 2;
+            n.y = Math.random() * (height * 0.4) + 50; // spawn aleatorio arriba
+        }
+        return; // No dibujar si es invisible
     }
+
+    if (n.cooldown > 0) n.cooldown--;
 
     // Físicas básicas con limitador del canvas
     n.x += n.vx;
@@ -1229,8 +1246,8 @@ function updateAndDrawCloud(landmarks, ctx, width, height) {
     if (n.x < 10) { n.x = 10; n.vx *= -1; }
     if (n.x + n.width > width - 10) { n.x = width - n.width - 10; n.vx *= -1; }
     if (n.y < 10) { n.y = 10; n.vy *= -1; }
-    // Dejar un margen debajo para no tapar los controles o info abajo
-    if (n.y + n.height > height * 0.75) { n.y = height * 0.75 - n.height; n.vy *= -1; }
+    // Margen debajo
+    if (n.y + n.height > height * 0.70) { n.y = height * 0.70 - n.height; n.vy *= -1; }
 
     // Interacción / Colisión con las manos
     if (landmarks) {
@@ -1242,59 +1259,74 @@ function updateAndDrawCloud(landmarks, ctx, width, height) {
                 
                 const cnx = n.x + n.width/2;
                 const cny = n.y + n.height/2;
-                
                 const dx = cnx - wx;
                 const dy = cny - wy;
                 const dist = Math.sqrt(dx*dx + dy*dy);
                 
-                if (dist < 150) { // Empuje
-                    n.vx += (dx / dist) * 1.8;
-                    n.vy += (dy / dist) * 1.8;
+                if (dist < 100) { // Hit radio
+                    n.vx += (dx / dist) * 2.5;
+                    n.vy += (dy / dist) * 2.5;
+                    
+                    if (n.cooldown <= 0) {
+                        n.hits++;
+                        n.cooldown = 20; // frame cooldown (~0.6s)
+                        
+                        if (n.hits >= 2) { // 2 toques y desaparece
+                            n.visible = false;
+                            n.spawnTimer = 210; // ~7 segundos de retraso
+                            n.textIndex = (n.textIndex + 1) % n.texts.length;
+                        }
+                    }
                 }
             }
         });
     }
 
-    // Fricción
+    // Fricción constante
     const speed = Math.sqrt(n.vx*n.vx + n.vy*n.vy);
-    if (speed > 3) {
-        n.vx *= 0.95;
-        n.vy *= 0.95;
-    } else if (speed < 0.6) {
+    if (speed > 2.5) {
+        n.vx *= 0.96;
+        n.vy *= 0.96;
+    } else if (speed < 0.5) {
         n.vx *= 1.05;
         n.vy *= 1.05;
     }
 
-    // --- Dibujo Visual de la Nube ---
+    // --- Dibujo Visual ---
     ctx.save();
-    ctx.fillStyle = 'rgba(20, 20, 20, 0.8)';
+    // Parpadeo visual cuando la tocan (transición roja)
+    if (n.cooldown > 10) {
+        ctx.fillStyle = 'rgba(150, 50, 50, 0.9)';
+    } else {
+        ctx.fillStyle = 'rgba(20, 20, 20, 0.85)';
+    }
+    
     ctx.strokeStyle = 'rgba(212, 165, 116, 0.8)';
     ctx.lineWidth = 2;
     ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
     ctx.shadowBlur = 10;
 
     ctx.beginPath();
-    ctx.roundRect(n.x, n.y, n.width, n.height, 25);
+    ctx.roundRect(n.x, n.y, n.width, n.height, 20);
     ctx.fill();
     ctx.stroke();
 
-    // Texto de la Nube
+    // Texto Nube
     ctx.shadowBlur = 0;
     ctx.fillStyle = '#d4a574';
-    ctx.font = 'italic 18px Georgia';
+    ctx.font = 'italic 14px Georgia';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText('☁️ ¿Sabías que?', n.x + n.width/2, n.y + 25);
+    ctx.fillText('☁️ ¿Sabías que?', n.x + n.width/2, n.y + 20);
 
     ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 16px Arial';
+    ctx.font = '14px Arial';
     
-    // Envoltura de texto
-    const text = n.texts[n.textIndex];
+    const text = n.texts[n.textIndex] || "";
     const words = text.split(' ');
     let line = '';
-    let currentY = n.y + 55;
-    const maxWidth = n.width - 40;
+    let currentY = n.y + 40;
+    const maxWidth = n.width - 30;
 
     for (let i = 0; i < words.length; i++) {
         const testLine = line + words[i] + ' ';
@@ -1302,7 +1334,7 @@ function updateAndDrawCloud(landmarks, ctx, width, height) {
         if (metrics.width > maxWidth && i > 0) {
             ctx.fillText(line, n.x + n.width/2, currentY);
             line = words[i] + ' ';
-            currentY += 22;
+            currentY += 18;
         } else {
             line = testLine;
         }
@@ -1310,6 +1342,70 @@ function updateAndDrawCloud(landmarks, ctx, width, height) {
     ctx.fillText(line, n.x + n.width/2, currentY);
 
     ctx.restore();
+}
+
+// Interacción virtual de las manos con el DOM
+function checkVirtualButtonClicks(landmarks, baseCanvas) {
+    if (!landmarks || State.botonCooldown) return;
+    
+    const botones = document.querySelectorAll('.btn-tela');
+    if (!botones.length) return;
+
+    const wrists = [landmarks[15], landmarks[16]];
+    const videoObj = State.videoElement;
+    if (!videoObj.videoWidth) return;
+
+    wrists.forEach(w => {
+        if (!w || w.visibility < 0.4) return;
+        
+        let rawX = w.x * videoObj.videoWidth;
+        let rawY = w.y * videoObj.videoHeight;
+        
+        const canvasRect = baseCanvas.getBoundingClientRect();
+        const scale = Math.max(canvasRect.width / videoObj.videoWidth, canvasRect.height / videoObj.videoHeight);
+        
+        const drawnWidth = videoObj.videoWidth * scale;
+        const drawnHeight = videoObj.videoHeight * scale;
+        const offsetX = (canvasRect.width - drawnWidth) / 2;
+        const offsetY = (canvasRect.height - drawnHeight) / 2;
+        
+        // El video y canvas están reflejados por CSS: => X física real visible en la pantalla
+        let screenX = canvasRect.left + offsetX + (drawnWidth - (rawX * scale));
+        let screenY = canvasRect.top + offsetY + (rawY * scale);
+        
+        botones.forEach(btn => {
+            const rect = btn.getBoundingClientRect();
+            // Margen generoso
+            const margin = 25;
+            if (screenX >= rect.left - margin && screenX <= rect.right + margin &&
+                screenY >= rect.top - margin && screenY <= rect.bottom + margin) {
+                
+                // Hover Visual Effect
+                btn.style.transform = 'scale(1.2)';
+                btn.style.boxShadow = '0 0 30px rgba(255, 255, 255, 0.9)';
+                btn.style.borderColor = '#d4a574';
+                
+                if (!btn.dataset.hoverTime) btn.dataset.hoverTime = Date.now();
+                
+                // Clic sostenido 1s
+                if (Date.now() - parseInt(btn.dataset.hoverTime) > 1000) {
+                    State.botonCooldown = true;
+                    btn.dataset.hoverTime = '';
+                    btn.style.transform = '';
+                    btn.click();
+                    
+                    setTimeout(() => State.botonCooldown = false, 2000);
+                }
+            } else {
+                if (btn.dataset.hoverTime) {
+                    btn.style.transform = '';
+                    btn.style.boxShadow = '';
+                    btn.style.borderColor = '';
+                    btn.dataset.hoverTime = '';
+                }
+            }
+        });
+    });
 }
 
 console.log('✅ App.js cargado correctamente');
