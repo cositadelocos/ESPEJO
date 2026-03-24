@@ -274,17 +274,17 @@ html, body {
 }
 
 .silueta-guia {
-    width: 90vw;
-    height: 90vh;
-    border: 3px dashed rgba(212, 165, 116, 0.5);
-    border-radius: 20px;
+    width: 80vw;
+    height: 80vh;
     position: relative;
+    max-width: 500px;
+    color: rgba(212, 165, 116, 0.5);
     animation: guia-pulse 2s infinite;
 }
 
 @keyframes guia-pulse {
-    0%, 100% { border-color: rgba(255, 255, 255, 0.3); }
-    50% { border-color: rgba(212, 165, 116, 0.6); }
+    0%, 100% { color: rgba(255, 255, 255, 0.3); }
+    50% { color: rgba(212, 165, 116, 0.8); }
 }
 
 .instruccion-cuerpo {

@@ -116,7 +116,9 @@ const State = {
     canvasElement: null,
     ctx: null,
     bodyPixNet: null,           // Modelo BodyPix cargado
-    segmentacionData: null      // Datos de segmentación del cuerpo
+    segmentacionData: null,     // Datos de segmentación del cuerpo
+    ultimoLandmarks: null,      // Últimos landmarks detectados
+    fotoLandmarks: null         // Landmarks guardados al tomar la foto
 };
 
 // ========================================
@@ -257,9 +259,8 @@ async function initMediaPipe() {
     try {
         State.camera = new Camera(State.videoElement, {
             onFrame: async () => {
-                if (State.faseActual === 'espejo' || State.faseActual === 'preparacion') {
-                    await State.pose.send({ image: State.videoElement });
-                }
+                // Siempre enviar frames: fase 1/2 para detectar cuerpo, fase 3 para gestos
+                await State.pose.send({ image: State.videoElement });
             },
             width: CONFIG.videoWidth,
             height: CONFIG.videoHeight
@@ -330,6 +331,8 @@ function onPoseResults(results) {
     State.ctx.clearRect(0, 0, State.canvasElement.width, State.canvasElement.height);
 
     if (results.poseLandmarks) {
+        State.ultimoLandmarks = results.poseLandmarks;
+
         // Dibujar landmarks (opcional, para debug)
         // drawConnectors(State.ctx, results.poseLandmarks, POSE_CONNECTIONS,
         //     { color: '#00FF00', lineWidth: 2 });
@@ -375,8 +378,30 @@ function detectarPersonaCompleta(landmarks) {
         }
     });
 
-    // Necesitamos al menos 5 de 7 puntos
-    return puntosVisibles >= 5;
+    let estaCentrado = true;
+    if (State.faseActual === 'preparacion') {
+        const hombroIzq = landmarks[11];
+        const hombroDer = landmarks[12];
+        const nariz = landmarks[0];
+
+        if (hombroIzq && hombroDer && nariz) {
+            // En fase de preparación, requerimos estar centrados en la silueta (centro X cercano a 0.5)
+            // MediaPipe: x=0 es izquierda, x=1 es derecha. La cámara está en espejo, pero MediaPipe da coordenadas en el frame.
+            const hombroX = (hombroIzq.x + hombroDer.x) / 2;
+            
+            // Permitimos un margen en el centro (ej. entre 0.35 y 0.65)
+            if (hombroX < 0.35 || hombroX > 0.65) estaCentrado = false;
+
+            // También evitamos estar demasiado cerca o demasiado lejos (anchura de hombros)
+            const anchoHombros = Math.abs(hombroIzq.x - hombroDer.x);
+            if (anchoHombros < 0.15 || anchoHombros > 0.45) estaCentrado = false;
+        } else {
+            estaCentrado = false;
+        }
+    }
+
+    // Necesitamos al menos 5 puntos y estar centrado si estamos en preparación
+    return puntosVisibles >= 5 && estaCentrado;
 }
 
 function onPersonaDetectada(detectada) {
@@ -483,6 +508,9 @@ function capturarFoto() {
 
     // Guardar foto
     State.fotoCapturada = canvas.toDataURL('image/jpeg', 0.9);
+    
+    // Guardar landmarks del momento de la foto
+    State.fotoLandmarks = State.ultimoLandmarks;
 
     // Mostrar en imagen oculta
     $('#img-capturada').src = State.fotoCapturada;
@@ -576,6 +604,49 @@ async function generarFotomontajeMejorado() {
     }
 }
 
+function dibujarTrajeAjustado(ctx, imgTraje, width, height, landmarks) {
+    if (!landmarks || landmarks.length === 0) {
+        ctx.drawImage(imgTraje, 0, 0, width, height);
+        return;
+    }
+
+    const hombroIzq = landmarks[11];
+    const hombroDer = landmarks[12];
+    const caderaIzq = landmarks[23];
+    const caderaDer = landmarks[24];
+
+    if (!hombroIzq || !hombroDer || !caderaIzq || !caderaDer || 
+        hombroIzq.visibility < 0.5 || hombroDer.visibility < 0.5) {
+        ctx.drawImage(imgTraje, 0, 0, width, height);
+        return;
+    }
+
+    // Calcular centro del torso superior
+    const centroTorsoX = (hombroIzq.x + hombroDer.x) / 2;
+    // Poner el centro Y un poco más abajo de los hombros (pecho)
+    const centroTorsoY = (hombroIzq.y + hombroDer.y) / 2 + 0.05;
+
+    // Distancias
+    const anchoHombros = Math.abs(hombroIzq.x - hombroDer.x);
+    const altoTorso = Math.abs(((hombroIzq.y + hombroDer.y) / 2) - ((caderaIzq.y + caderaDer.y) / 2));
+
+    // Escalas de ajuste (el PNG suele ser más ancho y largo que los landmarks base)
+    const scaleX = 2.8; 
+    const scaleY = 3.0; // Cubre piernas
+
+    const suitWidth = anchoHombros * width * scaleX;
+    // Si no detecta bien cadera/torso, usamos proporción sobre hombros
+    const altoReferencia = altoTorso > 0.1 ? altoTorso : anchoHombros * 1.5;
+    const suitHeight = altoReferencia * height * scaleY;
+
+    // Calcular X e Y (esquina superior izquierda del recorte)
+    const suitX = (centroTorsoX * width) - (suitWidth / 2);
+    // Subir un poco el traje (25% de su altura) para que el cuello coincida
+    const suitY = (centroTorsoY * height) - (suitHeight * 0.25); 
+
+    ctx.drawImage(imgTraje, suitX, suitY, suitWidth, suitHeight);
+}
+
 async function aplicarFotomontajeConSegmentacion(canvas, ctx, imgPersona, imgTraje, segmentacion) {
     console.log('🎨 Aplicando efecto BodyPix...');
 
@@ -626,12 +697,12 @@ async function aplicarFotomontajeConSegmentacion(canvas, ctx, imgPersona, imgTra
     personaCtx.globalCompositeOperation = 'destination-in';
     personaCtx.drawImage(maskCanvas, 0, 0);
 
-    // PASO 3: Escalar el traje al tamaño del canvas
+    // PASO 3: Dibujar traje ajustado al cuerpo
     const trajeCanvas = document.createElement('canvas');
     trajeCanvas.width = canvas.width;
     trajeCanvas.height = canvas.height;
     const trajeCtx = trajeCanvas.getContext('2d');
-    trajeCtx.drawImage(imgTraje, 0, 0, canvas.width, canvas.height);
+    dibujarTrajeAjustado(trajeCtx, imgTraje, canvas.width, canvas.height, State.fotoLandmarks);
 
     // PASO 4: Componer la imagen final
     // Primero: dibujar la persona
@@ -681,10 +752,10 @@ function aplicarFotomontajeSimple(canvas, ctx, imgPersona, imgTraje) {
     ctx.drawImage(imgPersona, 0, 0, canvas.width, canvas.height);
     ctx.restore();
 
-    // PASO 3: Mezclar traje
+    // PASO 3: Mezclar traje ajustado al cuerpo
     ctx.globalCompositeOperation = 'source-over';
     ctx.globalAlpha = 0.9;
-    ctx.drawImage(imgTraje, 0, 0, canvas.width, canvas.height);
+    dibujarTrajeAjustado(ctx, imgTraje, canvas.width, canvas.height, State.fotoLandmarks);
     ctx.globalAlpha = 1;
 
     console.log('✅ Fotomontaje simple completado');
