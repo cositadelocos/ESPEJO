@@ -42,8 +42,8 @@ const CONFIG = {
             region: 'Bogotá / Andes',
             anio: '1850–1950',
             datosCuriosos: [
-                'Se usaba exclusivamente para eventos de gala',
-                'Mientras los sastres cortaban, las mujeres debían coser sus prendas íntimas por pudor de la época'
+                'Símbolo de la más alta alcurnia y noches de etiqueta inolvidables.',
+                'Un reflejo de la elegancia victoriana, donde cada doblez ocultaba un secreto de la alta sociedad.'
             ],
             promptIA: `Atuendo masculino formal de etiqueta completa, estilo frac de influencia europea (mediados s. XIX - principios s. XX). Chaqueta de frac de lana negra de alta calidad con solapas de pico anchas, cuerpo frontal corto y colas traseras en picos simétricos. Chaleco de piqué de algodón blanco texturizado. Camisa blanca de algodón con cuello de pajarita rígido. Pantalón de vestir recto con raya diplomática fina en gris oscuro y negro. Corbatín de seda negra. Ajuste formal y elegante.`
         },
@@ -54,8 +54,8 @@ const CONFIG = {
             region: 'Cauca',
             anio: 'Actualidad',
             datosCuriosos: [
-                'No es ropa comprada — cada pieza fue tejida por la propia comunidad',
-                'Sus creadores escribieron su historia en la serie "Hilando Memoria"'
+                'No es tela comprada, es el espíritu ancestral de una comunidad hilado a mano.',
+                'Una prenda tejida con el corazón y la fuerza de los Andes Caucanos.'
             ],
             promptIA: `Atuendo femenino tradicional de la comunidad indígena Misak (Guambiano). Anaco de lana blanca con líneas horizontales azules y fucsia. Chumbe tejido a mano con diseños geométricos en azul, fucsia, verde y blanco. Rebozo de lana fucsia intenso que cubre hombros. Sombrero de fibra natural con pompones blancos, negros y fucsia. Collares de cuentas blancas densos. Botas de cuero. Texturas artesanales rústicas.`
         },
@@ -66,8 +66,8 @@ const CONFIG = {
             region: 'Islas / Caribe',
             anio: '1850–1950',
             datosCuriosos: [
-                'Refleja un mestizaje afro-europeo único en Colombia',
-                'Es de uso obligatorio en ritos religiosos — el vestido dicta el estatus en la isla'
+                'Una hermosa danza tejida entre las raíces africanas y la brisa europea del Caribe.',
+                'De uso sagrado en ceremonias, sus pliegues marcan la identidad y el alma isleña.'
             ],
             promptIA: `Vestido femenino tradicional de gala de San Andrés, Región Insular colombiana. Vestido de una pieza en algodón blanco con rayas verticales verdes claras y lunares verdes. Mangas cortas abullonadas con gran volante doble cruzado en V sobre pecho y hombros, ribete verde esmeralda oscuro. Botonadura central de botones verdes. Falda larga con panel inferior de encaje verde claro translúcido con patrones florales y festoneado. Silueta elegante colonial caribeña.`
         },
@@ -78,8 +78,8 @@ const CONFIG = {
             region: 'Boyacá / Andes',
             anio: '1850–1950',
             datosCuriosos: [
-                'Aparece en los registros de la Comisión Corográfica de 1850',
-                'Fue diseñado para sobrevivir al frío extremo de los Andes'
+                'Una prenda documentada desde 1850, testigo silencioso del trabajo duro en los campos.',
+                'Escudo cálido e inquebrantable contra las heladas madrugadas del páramo.'
             ],
             promptIA: `Atuendo masculino tradicional campesino de Boyacá, Andes colombianos. Ruana cuadrada grande de lana virgen color crudo/hueso con textura áspera, densa y pesada, flecos cortos en borde inferior, cuello en V con cordón. Camisa blanca de algodón bajo la ruana. Pantalón de vestir recto color chocolate oscuro en paño de lana mate. Sombrero de paja color ocre claro con cinta negra. Pañolón de lana blanca con puntos calados cubriendo cuello y mandíbula. Alpargatas de fique crudo. Aspecto rústico andino.`
         },
@@ -90,8 +90,8 @@ const CONFIG = {
             region: 'Antioquia',
             anio: '1850–1950',
             datosCuriosos: [
-                'El traje de las mineras de oro del río',
-                'Su joya más preciada no era el oro, sino la batea de madera para separar el metal de la arena'
+                'La fiel armadura de las mujeres que buscaban tesoros en las aguas de Antioquia.',
+                'Con oro en sus esperanzas y la batea en sus manos, forjaron la riqueza de toda una región.'
             ],
             promptIA: `Atuendo femenino tradicional de trabajo para minería de oro en ríos de Antioquia. Blusa de algodón ligero sin mangas, cuello redondo cerrado, color blanco puro, entallada en torso. Falda negra de tiro alto en algodón mate o lino, fruncida densamente en cintura, volumen de pliegues naturales que caen hasta debajo de rodillas, textura rugosa resistente. Pañuelo de cabeza triangular de algodón rojo escarlata vibrante cubriendo cabeza. Sombrero de fibra natural de ala ancha con cinta negra. Alpargatas de fique crudo. Contraste blanco-negro-rojo intenso.`
         }
@@ -785,11 +785,9 @@ function iniciarExperienciaTraje() {
     // Iniciar datos curiosos
     iniciarDatosCuriosos(traje);
 
-    // Mostrar hints de gestos
-    setTimeout(() => {
-        $('#gestos-hint').style.opacity = '0';
-        setTimeout(() => hideElement('#gestos-hint'), 1000);
-    }, 5000);
+    // Asegurar que los hints de gestos estén visibles permanentemente
+    $('#gestos-hint').style.opacity = '1';
+    showElement('#gestos-hint');
 }
 
 function iniciarDatosCuriosos(traje) {
@@ -904,7 +902,38 @@ async function cambiarTraje(direccion) {
     }, 1500);
 }
 
-function tomarFotoRecuerdo() {
+// Configuración de Cloudinary (Reemplazar con tus datos)
+const CLOUDINARY_CONFIG = {
+    cloudName: 'dqvzl4lgp',      // Cloud Name de la cuenta del usuario
+    uploadPreset: 'espejo_museo' // Upload preset que el usuario debe crear como Unsigned
+};
+
+async function subirFotoCloudinary(dataUrl) {
+    if (CLOUDINARY_CONFIG.cloudName === 'TU_CLOUD_NAME') {
+        throw new Error('Falta configuración de Cloudinary');
+    }
+
+    const url = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CONFIG.cloudName}/image/upload`;
+    
+    // Cloudinary upload requiere FormData
+    const formData = new FormData();
+    formData.append('file', dataUrl);
+    formData.append('upload_preset', CLOUDINARY_CONFIG.uploadPreset);
+
+    const response = await fetch(url, {
+        method: 'POST',
+        body: formData
+    });
+
+    if (!response.ok) {
+        throw new Error('Error HTTP al subir la imagen');
+    }
+
+    const data = await response.json();
+    return data.secure_url;
+}
+
+async function tomarFotoRecuerdo() {
     if (State.gestoCooldown) return;
 
     State.gestoCooldown = true;
@@ -924,19 +953,59 @@ function tomarFotoRecuerdo() {
     // Dibujar imagen actual
     ctx.drawImage(canvasOriginal, 0, 0, canvasRecuerdo.width, canvasRecuerdo.height);
 
-    // Añadir marca de agua del museo
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
-    ctx.fillRect(20, canvasRecuerdo.height - 100, canvasRecuerdo.width - 40, 70);
+    // Añadir marca de agua del museo (caja más grande para el texto nuevo)
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
+    ctx.fillRect(15, canvasRecuerdo.height - 160, canvasRecuerdo.width - 30, 145);
 
     ctx.fillStyle = '#2c1810';
-    ctx.font = 'bold 22px Georgia';
     ctx.textAlign = 'center';
-    ctx.fillText('Museo de Trajes de Bogotá', canvasRecuerdo.width / 2, canvasRecuerdo.height - 60);
-    ctx.font = '16px Arial';
-    ctx.fillText('El Hilo que Nos Conecta', canvasRecuerdo.width / 2, canvasRecuerdo.height - 35);
+    
+    ctx.font = 'bold 28px Georgia';
+    ctx.fillText('Museo de Trajes de Bogotá', canvasRecuerdo.width / 2, canvasRecuerdo.height - 120);
+    
+    ctx.font = 'italic 20px Georgia';
+    ctx.fillText('El Hilo que Nos Conecta', canvasRecuerdo.width / 2, canvasRecuerdo.height - 90);
+
+    ctx.font = '18px Arial';
+    ctx.fillText('Si quieres saber más, visita el museo en:', canvasRecuerdo.width / 2, canvasRecuerdo.height - 60);
+    
+    ctx.font = 'bold 20px Arial';
+    ctx.fillText('Calle 10 # 6-26, Bogotá', canvasRecuerdo.width / 2, canvasRecuerdo.height - 35);
 
     // Mostrar modal
     showElement('#modal-foto');
+
+    // Preparar UI del QR
+    $('#qr-container').innerHTML = '';
+    $('#qr-container').style.display = 'none';
+    $('#qr-loading').textContent = '⏳ Subiendo foto para escanear...';
+    $('#qr-loading').style.color = '#d4a574';
+    showElement('#qr-loading');
+    hideElement('#qr-instructions');
+
+    // Intentar subir imagen de forma asíncrona
+    try {
+        const dataUrl = canvasRecuerdo.toDataURL('image/jpeg', 0.8);
+        const imageUrl = await subirFotoCloudinary(dataUrl);
+
+        hideElement('#qr-loading');
+        $('#qr-container').style.display = 'block';
+        showElement('#qr-instructions');
+
+        // Generar QR
+        new QRCode($('#qr-container'), {
+            text: imageUrl,
+            width: 160,
+            height: 160,
+            colorDark : "#2c1810",
+            colorLight : "#ffffff",
+            correctLevel : QRCode.CorrectLevel.L
+        });
+    } catch (error) {
+        console.error('Error generando QR:', error);
+        $('#qr-loading').textContent = '⚠️ Falta configurar Cloud Name y Upload Preset en app.js';
+        $('#qr-loading').style.color = '#ff4444';
+    }
 
     setTimeout(() => {
         State.gestoCooldown = false;

@@ -16,6 +16,8 @@
     <!-- TensorFlow.js + BodyPix -->
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.10.0/dist/tf.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/body-pix@2.2.0/dist/body-pix.min.js"></script>
+    <!-- QR Code Generator -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 </head>
 <body>
     <!-- FASE 1: El Espejo -->
@@ -151,6 +153,13 @@
         <div class="modal-content">
             <h3>¡Tu recuerdo del museo!</h3>
             <canvas id="canvas-recuerdo"></canvas>
+            
+            <div id="qr-section">
+                <p id="qr-loading">⏳ Subiendo foto para escanear...</p>
+                <div id="qr-container"></div>
+                <p id="qr-instructions" class="hidden">¡Escanea con tu celular para descargar la foto!</p>
+            </div>
+
             <div class="modal-buttons">
                 <button id="btn-descargar" class="btn-primario">📥 Descargar</button>
                 <button id="btn-cerrar-modal" class="btn-secundario">Cerrar</button>
