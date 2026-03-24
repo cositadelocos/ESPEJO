@@ -114,7 +114,9 @@ const State = {
     holistic: null,
     videoElement: null,
     canvasElement: null,
-    ctx: null
+    ctx: null,
+    bodyPixNet: null,           // Modelo BodyPix cargado
+    segmentacionData: null      // Datos de segmentación del cuerpo
 };
 
 // ========================================
@@ -266,12 +268,56 @@ async function initMediaPipe() {
         await State.camera.start();
         console.log('✅ Cámara iniciada');
 
+        // Cargar BodyPix para segmentación (gratis, corre en el navegador)
+        await cargarBodyPix();
+
         // Actualizar estado
         $('#status-text').textContent = 'Cámara activa - Acércate al espejo';
 
     } catch (error) {
         console.error('❌ Error al iniciar cámara:', error);
         $('#status-text').textContent = 'Error de cámara - Recarga la página';
+    }
+}
+
+// ========================================
+// BODYPIX - CARGA Y SEGMENTACIÓN
+// ========================================
+
+async function cargarBodyPix() {
+    console.log('🤖 Cargando BodyPix...');
+    try {
+        // Cargar modelo de segmentación de cuerpo
+        State.bodyPixNet = await bodyPix.load({
+            architecture: 'MobileNetV1',
+            outputStride: 16,
+            multiplier: 0.5,  // 0.5 = más rápido, 1.0 = más preciso
+            quantBytes: 2     // 2 = buen balance precisión/velocidad
+        });
+        console.log('✅ BodyPix cargado');
+    } catch (error) {
+        console.error('❌ Error cargando BodyPix:', error);
+    }
+}
+
+async function segmentarPersona(imagen) {
+    if (!State.bodyPixNet) {
+        console.log('⚠️ BodyPix no disponible, usando fotomontaje simple');
+        return null;
+    }
+
+    console.log('🔍 Segmentando persona...');
+    try {
+        const segmentacion = await State.bodyPixNet.segmentPerson(imagen, {
+            internalResolution: 'medium',
+            segmentationThreshold: 0.7
+        });
+
+        console.log('✅ Persona segmentada');
+        return segmentacion;
+    } catch (error) {
+        console.error('❌ Error en segmentación:', error);
+        return null;
     }
 }
 
@@ -448,11 +494,11 @@ function capturarFoto() {
 }
 
 // ========================================
-// PROCESAMIENTO CON IA (SIMULADO)
+// PROCESAMIENTO CON IA (GRATIS - BODYPIX)
 // ========================================
 
 async function procesarConIA() {
-    console.log('🤖 Procesando con IA...');
+    console.log('🤖 Procesando con BodyPix (IA local gratuita)...');
 
     // Mostrar loading
     cambiarFase('traje');
@@ -462,91 +508,192 @@ async function procesarConIA() {
     const traje = CONFIG.trajes[State.trajeActual];
     $('#img-traje').src = traje.archivo;
 
-    // Esperar a que la imagen cargue
+    // Esperar carga
     await new Promise((resolve) => {
         $('#img-traje').onload = resolve;
-        $('#img-capturada').onload = resolve;
-        setTimeout(resolve, 2000); // Mínimo 2 segundos de "procesamiento"
+        setTimeout(resolve, 1000);
     });
 
-    // Simular procesamiento IA
-    setTimeout(() => {
+    // Generar fotomontaje con BodyPix
+    try {
+        await generarFotomontajeMejorado();
         hideElement('#loading-ia');
+        iniciarExperienciaTraje();
+    } catch (error) {
+        console.error('❌ Error en fotomontaje:', error);
+        hideElement('#loading-ia');
+        // Fallback simple
         generarFotomontaje();
         iniciarExperienciaTraje();
-    }, 1500);
+    }
 }
 
-function generarFotomontaje() {
+// ========================================
+// FOTOMONTAJE CON BODYPIX (GRATIS)
+// ========================================
+
+async function generarFotomontajeMejorado() {
     const traje = CONFIG.trajes[State.trajeActual];
     const canvas = $('#traje-canvas');
     const ctx = canvas.getContext('2d');
 
-    // Dimensiones del canvas
-    canvas.width = 800;
-    canvas.height = 1200;
+    // Cargar imágenes
+    const imgPersona = new Image();
+    const imgTraje = new Image();
 
-    // Limpiar canvas
-    ctx.fillStyle = '#1a1a2e';
+    imgPersona.crossOrigin = 'anonymous';
+    imgTraje.crossOrigin = 'anonymous';
+
+    await new Promise((resolve) => {
+        imgPersona.onload = resolve;
+        imgPersona.src = State.fotoCapturada;
+    });
+
+    await new Promise((resolve) => {
+        imgTraje.onload = resolve;
+        imgTraje.src = traje.archivo;
+    });
+
+    // Ajustar canvas al tamaño de la foto
+    canvas.width = imgPersona.width;
+    canvas.height = imgPersona.height;
+
+    // Segmentar persona con BodyPix
+    const segmentacion = await segmentarPersona(imgPersona);
+
+    if (segmentacion) {
+        // ========================================
+        // MODO AVANZADO: Con segmentación BodyPix
+        // ========================================
+        await aplicarFotomontajeConSegmentacion(
+            canvas, ctx, imgPersona, imgTraje, segmentacion
+        );
+    } else {
+        // ========================================
+        // MODO SIMPLE: Sin segmentación
+        // ========================================
+        aplicarFotomontajeSimple(canvas, ctx, imgPersona, imgTraje);
+    }
+}
+
+async function aplicarFotomontajeConSegmentacion(canvas, ctx, imgPersona, imgTraje, segmentacion) {
+    console.log('🎨 Aplicando efecto BodyPix...');
+
+    // Crear canvas temporal para la máscara
+    const maskCanvas = document.createElement('canvas');
+    maskCanvas.width = canvas.width;
+    maskCanvas.height = canvas.height;
+    const maskCtx = maskCanvas.getContext('2d');
+
+    // Dibujar la máscara de segmentación (persona = blanco, fondo = negro)
+    const maskImageData = maskCtx.createImageData(canvas.width, canvas.height);
+    const data = maskImageData.data;
+
+    for (let i = 0; i < segmentacion.data.length; i++) {
+        const pixelIndex = i * 4;
+        if (segmentacion.data[i] === 1) {
+            // Persona - blanco
+            data[pixelIndex] = 255;
+            data[pixelIndex + 1] = 255;
+            data[pixelIndex + 2] = 255;
+            data[pixelIndex + 3] = 255;
+        } else {
+            // Fondo - transparente
+            data[pixelIndex] = 0;
+            data[pixelIndex + 1] = 0;
+            data[pixelIndex + 2] = 0;
+            data[pixelIndex + 3] = 0;
+        }
+    }
+    maskCtx.putImageData(maskImageData, 0, 0);
+
+    // PASO 1: Fondo degradado elegante
+    const fondoGradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+    fondoGradient.addColorStop(0, '#2c1810');
+    fondoGradient.addColorStop(0.5, '#1a1a2e');
+    fondoGradient.addColorStop(1, '#16213e');
+    ctx.fillStyle = fondoGradient;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // Cargar imágenes
-    const imgTraje = new Image();
-    const imgPersona = new Image();
+    // PASO 2: Crear imagen de la persona con fondo transparente
+    const personaCanvas = document.createElement('canvas');
+    personaCanvas.width = canvas.width;
+    personaCanvas.height = canvas.height;
+    const personaCtx = personaCanvas.getContext('2d');
 
-    imgTraje.onload = () => {
-        imgPersona.onload = () => {
-            // Dibujar fondo degradado
-            const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
-            gradient.addColorStop(0, '#2c1810');
-            gradient.addColorStop(0.5, '#1a1a2e');
-            gradient.addColorStop(1, '#16213e');
-            ctx.fillStyle = gradient;
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
+    // Aplicar máscara a la persona
+    personaCtx.drawImage(imgPersona, 0, 0);
+    personaCtx.globalCompositeOperation = 'destination-in';
+    personaCtx.drawImage(maskCanvas, 0, 0);
 
-            // Calcular dimensiones para centrar
-            const scale = Math.min(
-                canvas.width / imgPersona.width,
-                canvas.height / imgPersona.height
-            ) * 0.9;
+    // PASO 3: Escalar el traje al tamaño del canvas
+    const trajeCanvas = document.createElement('canvas');
+    trajeCanvas.width = canvas.width;
+    trajeCanvas.height = canvas.height;
+    const trajeCtx = trajeCanvas.getContext('2d');
+    trajeCtx.drawImage(imgTraje, 0, 0, canvas.width, canvas.height);
 
-            const x = (canvas.width - imgPersona.width * scale) / 2;
-            const y = (canvas.height - imgPersona.height * scale) / 2;
+    // PASO 4: Componer la imagen final
+    // Primero: dibujar la persona
+    ctx.save();
+    ctx.translate(canvas.width, 0);
+    ctx.scale(-1, 1); // Espejo
+    ctx.drawImage(personaCanvas, 0, 0);
+    ctx.restore();
 
-            // Dibujar persona primero
-            ctx.drawImage(
-                imgPersona,
-                x, y,
-                imgPersona.width * scale,
-                imgPersona.height * scale
-            );
+    // Segundo: aplicar el traje sobre la persona usando la máscara
+    // Solo donde hay persona (efecto de ropa)
+    ctx.globalCompositeOperation = 'source-atop';
+    ctx.globalAlpha = 0.85;
+    ctx.drawImage(trajeCanvas, 0, 0);
 
-            // Dibujar traje superpuesto (con transparencia para efecto)
-            ctx.globalAlpha = 0.95;
-            ctx.drawImage(
-                imgTraje,
-                0, 0,
-                canvas.width,
-                canvas.height
-            );
-            ctx.globalAlpha = 1;
+    // Tercero: restaurar composición y agregar suavizado
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.globalAlpha = 1.0;
 
-            // Añadir borde decorativo
-            ctx.strokeStyle = '#d4a574';
-            ctx.lineWidth = 8;
-            ctx.strokeRect(20, 20, canvas.width - 40, canvas.height - 40);
+    // PASO 5: Iluminación y efectos finales
+    // Vignette sutil
+    const vignette = ctx.createRadialGradient(
+        canvas.width / 2, canvas.height / 2,
+        canvas.height * 0.3,
+        canvas.width / 2, canvas.height / 2,
+        canvas.height * 0.8
+    );
+    vignette.addColorStop(0, 'rgba(0,0,0,0)');
+    vignette.addColorStop(1, 'rgba(0,0,0,0.2)');
+    ctx.fillStyle = vignette;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            // Añadir título
-            ctx.fillStyle = '#d4a574';
-            ctx.font = 'bold 24px Georgia';
-            ctx.textAlign = 'center';
-            ctx.fillText('Museo de Trajes de Bogotá', canvas.width / 2, 60);
-            ctx.font = 'italic 18px Georgia';
-            ctx.fillText(traje.nombre, canvas.width / 2, 90);
-        };
-        imgPersona.src = State.fotoCapturada;
-    };
-    imgTraje.src = traje.archivo;
+    console.log('✅ Fotomontaje con BodyPix completado');
+}
+
+function aplicarFotomontajeSimple(canvas, ctx, imgPersona, imgTraje) {
+    console.log('🎨 Aplicando fotomontaje simple...');
+
+    // PASO 1: Fondo
+    ctx.fillStyle = '#1a1a1a';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // PASO 2: Dibujar persona (espejo)
+    ctx.save();
+    ctx.translate(canvas.width, 0);
+    ctx.scale(-1, 1);
+    ctx.drawImage(imgPersona, 0, 0, canvas.width, canvas.height);
+    ctx.restore();
+
+    // PASO 3: Mezclar traje
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.globalAlpha = 0.9;
+    ctx.drawImage(imgTraje, 0, 0, canvas.width, canvas.height);
+    ctx.globalAlpha = 1;
+
+    console.log('✅ Fotomontaje simple completado');
+}
+
+// Función original mantenida por compatibilidad - ahora redirige a la mejorada
+function generarFotomontaje() {
+    // Redirige a la versión con BodyPix
+    generarFotomontajeMejorado();
 }
 
 // ========================================
@@ -651,7 +798,7 @@ function detectarGestos(landmarks) {
     }
 }
 
-function cambiarTraje(direccion) {
+async function cambiarTraje(direccion) {
     if (State.gestoCooldown) return;
 
     State.gestoCooldown = true;
@@ -669,11 +816,16 @@ function cambiarTraje(direccion) {
     // Regenerar fotomontaje con nueva imagen
     showElement('#loading-ia');
 
-    setTimeout(() => {
+    try {
+        await generarFotomontajeMejorado();
+        hideElement('#loading-ia');
+        iniciarExperienciaTraje();
+    } catch (error) {
+        console.error('❌ Error:', error);
         hideElement('#loading-ia');
         generarFotomontaje();
         iniciarExperienciaTraje();
-    }, 1000);
+    }
 
     // Cooldown de 1.5 segundos
     setTimeout(() => {

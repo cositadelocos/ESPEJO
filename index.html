@@ -13,6 +13,9 @@
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/holistic/holistic.js" crossorigin="anonymous"></script>
     <!-- Face API.js for face detection -->
     <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
+    <!-- TensorFlow.js + BodyPix -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.10.0/dist/tf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/body-pix@2.2.0/dist/body-pix.min.js"></script>
 </head>
 <body>
     <!-- FASE 1: El Espejo -->
@@ -91,8 +94,8 @@
             <!-- Loading overlay -->
             <div id="loading-ia" class="loading-ia hidden">
                 <div class="spinner"></div>
-                <div class="loading-text">La IA está vistiéndote...</div>
-                <div class="loading-subtext">Esto tomará unos segundos</div>
+                <div class="loading-text">Analizando tu silueta...</div>
+                <div class="loading-subtext">BodyPix IA - 100% gratuito</div>
             </div>
 
             <!-- Datos curiosos flotantes -->
