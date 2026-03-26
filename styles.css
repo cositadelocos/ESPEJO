@@ -153,6 +153,28 @@ html, body {
     100% { opacity: 0; }
 }
 
+/* Botón Pantalla Completa */
+.btn-flotante-top-right {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    background: rgba(20, 10, 5, 0.8);
+    border: 2px solid var(--color-accent);
+    color: #fff;
+    padding: 10px 15px;
+    border-radius: 15px;
+    font-weight: bold;
+    cursor: pointer;
+    z-index: 100;
+    transition: all 0.3s;
+    font-family: Arial, sans-serif;
+}
+
+.btn-flotante-top-right:hover {
+    transform: scale(1.1);
+    box-shadow: 0 0 15px rgba(212, 165, 116, 0.6);
+}
+
 /* Botones de telas */
 .botones-telas {
     position: absolute;

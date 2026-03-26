@@ -20,6 +20,11 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 </head>
 <body>
+    <!-- Botón Pantalla Completa (Global) -->
+    <button id="btn-fullscreen" class="btn-flotante-top-right">
+        ⛶ Pantalla Completa
+    </button>
+
     <!-- FASE 1: El Espejo -->
     <div id="fase-espejo" class="fase active">
         <div class="camera-container">
@@ -161,8 +166,8 @@
                     <span>Levanta el brazo<br>derecho</span>
                 </div>
                 <div class="gesto">
-                    <span class="gesto-icon">👏</span>
-                    <span>Junta las manos<br>para salir</span>
+                    <span class="gesto-icon">👋</span>
+                    <span>Agita tu mano<br>arriba para salir</span>
                 </div>
             </div>
 
@@ -202,7 +207,7 @@
                 
                 <div class="modal-buttons">
                     <button id="btn-descargar" class="btn-accion interactable">Descargar Imagen</button>
-                    <button id="btn-cerrar-modal" class="btn-accion secundario interactable">Cerrar</button>
+                    <button id="btn-cerrar-modal" class="btn-accion secundario interactable">Volver</button>
                 </div>
             </div>
         </div>

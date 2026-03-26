@@ -224,6 +224,30 @@ function checkResources() {
 }
 
 function initEventListeners() {
+    // Pantalla Completa
+    const btnFullscreen = document.getElementById('btn-fullscreen');
+    if (btnFullscreen) {
+        btnFullscreen.addEventListener('click', () => {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen().catch(err => {
+                    console.error(`Error Fullscreen: ${err.message}`);
+                });
+            } else {
+                if (document.exitFullscreen) {
+                    document.exitFullscreen();
+                }
+            }
+        });
+
+        document.addEventListener('fullscreenchange', () => {
+            if (document.fullscreenElement) {
+                btnFullscreen.innerHTML = '✖ Salir Pantalla Completa';
+            } else {
+                btnFullscreen.innerHTML = '⛶ Pantalla Completa';
+            }
+        });
+    }
+
     // Botones de telas
     $$('.btn-tela').forEach(btn => {
         btn.addEventListener('click', (e) => {
@@ -922,23 +946,54 @@ function detectarGestos(landmarks) {
     const shoulderY = (leftShoulder.y + rightShoulder.y) / 2;
     const shoulderX = (leftShoulder.x + rightShoulder.x) / 2;
 
-    // Gesto de Salida: APLAUSO (juntar las muñecas)
-    if (leftWrist.visibility > 0.4 && rightWrist.visibility > 0.4) {
-        const dx = leftWrist.x - rightWrist.x;
-        const dy = leftWrist.y - rightWrist.y;
-        const dist = Math.sqrt(dx*dx + dy*dy);
-        
-        // Si las muñecas están muy juntas
-        if (dist < 0.09) {
-            console.log("👏 Aplauso detectado (Salir)");
-            showGestureIndicator('👏');
-            State.gestoCooldown = true;
+    // Gesto de Salida: DESPEDIDA (Agitar mano por encima del hombro)
+    const izqArriba = leftWrist.visibility > 0.5 && leftWrist.y < leftShoulder.y;
+    const derArriba = rightWrist.visibility > 0.5 && rightWrist.y < rightShoulder.y;
+
+    if (izqArriba || derArriba) {
+        // Usar la mano que esté más alta
+        const manoActiva = (izqArriba && derArriba) ? 
+            (leftWrist.y < rightWrist.y ? leftWrist : rightWrist) : 
+            (izqArriba ? leftWrist : rightWrist);
             
-            setTimeout(() => {
-                resetearExperiencia();
-            }, 1000);
-            return;
+        State.historialDespedida.push({
+            x: manoActiva.x,
+            time: Date.now()
+        });
+        
+        // Mantener el historial limpio (solo últimos 1.5 segundos)
+        State.historialDespedida = State.historialDespedida.filter(p => Date.now() - p.time < 1500);
+        
+        if (State.historialDespedida.length > 5) {
+            let cambiosDireccion = 0;
+            let dirActual = 0;
+            
+            for (let i = 1; i < State.historialDespedida.length; i++) {
+                const dx = State.historialDespedida[i].x - State.historialDespedida[i-1].x;
+                if (Math.abs(dx) > 0.015) { // umbral de movimiento horizontal
+                    const nuevaDir = Math.sign(dx);
+                    if (dirActual !== 0 && nuevaDir !== dirActual) {
+                        cambiosDireccion++;
+                    }
+                    dirActual = nuevaDir;
+                }
+            }
+            
+            // Si la mano cambió de dirección 3 o más veces: es un adiós
+            if (cambiosDireccion >= 3) {
+                console.log("👋 Despedida detectada");
+                showGestureIndicator('👋');
+                State.gestoCooldown = true;
+                State.historialDespedida = [];
+                
+                setTimeout(() => {
+                    resetearExperiencia();
+                }, 1000);
+                return;
+            }
         }
+    } else {
+        State.historialDespedida = [];
     }
 
     // Gesto: Brazo derecho extendido (siguiente traje)
