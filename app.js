@@ -1312,12 +1312,16 @@ function updateAndDrawCloud(landmarks, ctx, width, height) {
     ctx.stroke();
 
     // Texto Nube
+    ctx.save();
+    ctx.translate(n.x + n.width/2, 0); // Ir al centro logométrico para escribir
+    ctx.scale(-1, 1); // Doblemente espejado resulta en lectura normal real
+
     ctx.shadowBlur = 0;
     ctx.fillStyle = '#d4a574';
     ctx.font = 'italic 14px Georgia';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText('☁️ ¿Sabías que?', n.x + n.width/2, n.y + 20);
+    ctx.fillText('☁️ ¿Sabías que?', 0, n.y + 20);
 
     ctx.fillStyle = '#ffffff';
     ctx.font = '14px Arial';
@@ -1332,16 +1336,17 @@ function updateAndDrawCloud(landmarks, ctx, width, height) {
         const testLine = line + words[i] + ' ';
         const metrics = ctx.measureText(testLine);
         if (metrics.width > maxWidth && i > 0) {
-            ctx.fillText(line, n.x + n.width/2, currentY);
+            ctx.fillText(line, 0, currentY);
             line = words[i] + ' ';
             currentY += 18;
         } else {
             line = testLine;
         }
     }
-    ctx.fillText(line, n.x + n.width/2, currentY);
+    ctx.fillText(line, 0, currentY);
 
-    ctx.restore();
+    ctx.restore(); // Restaura escala espejada
+    ctx.restore(); // Restaura nube base
 }
 
 // Interacción virtual de las manos con el DOM
@@ -1354,6 +1359,9 @@ function checkVirtualButtonClicks(landmarks, baseCanvas) {
     const wrists = [landmarks[15], landmarks[16]];
     const videoObj = State.videoElement;
     if (!videoObj.videoWidth) return;
+
+    // Trackear botones tocados en ESTE frame para prevenir parpadeo (1 mano vs la otra)
+    const hoveredButtons = new Set();
 
     wrists.forEach(w => {
         if (!w || w.visibility < 0.4) return;
@@ -1375,18 +1383,26 @@ function checkVirtualButtonClicks(landmarks, baseCanvas) {
         
         botones.forEach(btn => {
             const rect = btn.getBoundingClientRect();
-            // Margen generoso
-            const margin = 25;
+            // Margen generoso (Hitbox)
+            const margin = 20;
             if (screenX >= rect.left - margin && screenX <= rect.right + margin &&
                 screenY >= rect.top - margin && screenY <= rect.bottom + margin) {
-                
-                // Hover Visual Effect
-                btn.style.transform = 'scale(1.2)';
-                btn.style.boxShadow = '0 0 30px rgba(255, 255, 255, 0.9)';
-                btn.style.borderColor = '#d4a574';
-                
-                if (!btn.dataset.hoverTime) btn.dataset.hoverTime = Date.now();
-                
+                hoveredButtons.add(btn); // Registrar colisión positiva
+            }
+        });
+    });
+
+    // Procesar el estado de hover consolidado para que ambas manos puedan interactuar limpiamente
+    botones.forEach(btn => {
+        if (hoveredButtons.has(btn)) {
+            // Hover Visual Effect
+            btn.style.transform = 'scale(1.2)';
+            btn.style.boxShadow = '0 0 30px rgba(255, 255, 255, 0.9)';
+            btn.style.borderColor = '#d4a574';
+            
+            if (!btn.dataset.hoverTime) {
+                btn.dataset.hoverTime = Date.now();
+            } else {
                 // Clic sostenido 1s
                 if (Date.now() - parseInt(btn.dataset.hoverTime) > 1000) {
                     State.botonCooldown = true;
@@ -1396,15 +1412,16 @@ function checkVirtualButtonClicks(landmarks, baseCanvas) {
                     
                     setTimeout(() => State.botonCooldown = false, 2000);
                 }
-            } else {
-                if (btn.dataset.hoverTime) {
-                    btn.style.transform = '';
-                    btn.style.boxShadow = '';
-                    btn.style.borderColor = '';
-                    btn.dataset.hoverTime = '';
-                }
             }
-        });
+        } else {
+            // No touch = Resetear estado
+            if (btn.dataset.hoverTime) {
+                btn.style.transform = '';
+                btn.style.boxShadow = '';
+                btn.style.borderColor = '';
+                btn.dataset.hoverTime = '';
+            }
+        }
     });
 }
 
