@@ -241,6 +241,11 @@ function initEventListeners() {
         });
     });
 
+    // Botones de las Cápsulas de Datos
+    $('#btn-dato-1').addEventListener('click', () => abrirPanelCuriosidad(0));
+    $('#btn-dato-2').addEventListener('click', () => abrirPanelCuriosidad(1));
+    $('#btn-cerrar-dato').addEventListener('click', cerrarPanelCuriosidad);
+
     // Botón volver
     $('#btn-volver').addEventListener('click', () => {
         resetearExperiencia();
@@ -401,15 +406,11 @@ function onPoseResults(results) {
         // Dibujar elementos interactivos de la pantalla
         if (State.overlayCtx && State.videoElement.videoWidth) {
             
-            // Interactuar con botones virtuales
-            if (State.faseActual === 'espejo') {
+            // Interactuar con botones virtuales en pantallas interactivas
+            if (State.faseActual === 'espejo' || State.faseActual === 'traje') {
                 checkVirtualButtonClicks(results.poseLandmarks, State.overlayCanvas);
             }
 
-            // Nubes en traje
-            if (State.faseActual === 'traje') {
-                updateAndDrawCloud(results.poseLandmarks, State.overlayCtx, State.overlayCanvas.width, State.overlayCanvas.height);
-            }
             drawHandTracking(results.poseLandmarks, State.overlayCtx, State.overlayCanvas.width, State.overlayCanvas.height);
         }
 
@@ -876,23 +877,29 @@ function iniciarExperienciaTraje() {
 }
 
 function iniciarDatosCuriosos(traje) {
-    if (!traje.datosCuriosos || traje.datosCuriosos.length === 0) return;
+    if (!traje.datosCuriosos || traje.datosCuriosos.length === 0) {
+        hideElement('#ui-curiosidades');
+        return;
+    }
     
-    State.nube = {
-        x: CONFIG.videoWidth ? CONFIG.videoWidth / 2 : 200,
-        y: 80,
-        width: 300,
-        height: 85,
-        vx: (Math.random() > 0.5 ? 1 : -1) * 1.5,
-        vy: (Math.random() > 0.5 ? 1 : -1) * 1.2,
-        textIndex: 0,
-        texts: traje.datosCuriosos,
-        hits: 0,
-        cooldown: 0,
-        spawnTimer: 90, // ~3 segs retraso antes de salir la primera vez
-        active: true,
-        visible: false
-    };
+    // Asignar al estado global
+    State.datosActuales = traje.datosCuriosos;
+    
+    // Preparar UI inicial
+    hideElement('#panel-curiosidad');
+    showElement('#ui-curiosidades');
+}
+
+function abrirPanelCuriosidad(index) {
+    if (!State.datosActuales || !State.datosActuales[index]) return;
+    $('#texto-curiosidad-expandido').textContent = State.datosActuales[index];
+    hideElement('#ui-curiosidades');
+    showElement('#panel-curiosidad');
+}
+
+function cerrarPanelCuriosidad() {
+    hideElement('#panel-curiosidad');
+    showElement('#ui-curiosidades');
 }
 
 // ========================================
@@ -1141,6 +1148,8 @@ function resetearExperiencia() {
     hideElement('#botones-telas');
     hideElement('#loading-ia');
     hideElement('#modal-foto');
+    hideElement('#ui-curiosidades');
+    hideElement('#panel-curiosidad');
 
     // Resetear UI
     $('#status-text').textContent = 'Acércate al espejo...';

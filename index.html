@@ -42,13 +42,13 @@
 
         <!-- Botones de telas (FASE 1) -->
         <div id="botones-telas" class="botones-telas hidden">
-            <button class="btn-tela" data-tela="algodon" data-traje="frac">
+            <button class="btn-tela interactable" data-tela="algodon" data-traje="frac">
                 <div class="tela-preview" style="background: linear-gradient(135deg, #f5f5f5 0%, #e0e0e0 50%, #f0f0f0 100%);"></div>
             </button>
-            <button class="btn-tela" data-tela="lana" data-traje="misak">
+            <button class="btn-tela interactable" data-tela="lana" data-traje="misak">
                 <div class="tela-preview" style="background: linear-gradient(135deg, #2c1810 0%, #4a3728 50%, #3d2820 100%);"></div>
             </button>
-            <button class="btn-tela" data-tela="encaje" data-traje="vestido">
+            <button class="btn-tela interactable" data-tela="encaje" data-traje="vestido">
                 <div class="tela-preview" style="background: linear-gradient(135deg, #ffffff 0%, #f8f8f8 50%, #fff0f5 100%); border: 1px solid #ddd;"></div>
             </button>
         </div>
@@ -101,9 +101,24 @@
 
     <!-- FASE 3: Visualización del Traje -->
     <div id="fase-traje" class="fase">
-        <div class="traje-container">
+        <div class="camera-container">
             <!-- Canvas para el fotomontaje -->
             <canvas id="traje-canvas"></canvas>
+
+            <!-- Textos flotantes y UI de Curiosidades -->
+            <div id="ui-curiosidades" class="ui-curiosidades hidden">
+                <div class="curiosidades-header">Acerca tu mano a estos para descubrir más</div>
+                <div class="capsulas-container">
+                    <button class="btn-capsula interactable" id="btn-dato-1">☁️ Curiosidad 1</button>
+                    <button class="btn-capsula interactable" id="btn-dato-2">☁️ Curiosidad 2</button>
+                </div>
+            </div>
+
+            <!-- Panel Modal de Curiosidad Extendida -->
+            <div id="panel-curiosidad" class="panel-curiosidad hidden">
+                <button class="btn-cerrar interactable" id="btn-cerrar-dato">✖ Volver</button>
+                <div class="panel-contenido" id="texto-curiosidad-expandido"></div>
+            </div>
 
             <!-- Imagen del traje (oculta, usada para canvas) -->
             <img id="img-traje" class="hidden" alt="Traje histórico">
@@ -157,7 +172,9 @@
             </div>
 
             <!-- Botón volver -->
-            <button id="btn-volver" class="btn-volver">↩ Volver al espejo</button>
+            <button id="btn-volver" class="btn-flotante interactable">
+            <span class="icon">↺</span> Terminar
+        </button>
         </div>
     </div>
 
@@ -178,8 +195,15 @@
             </div>
 
             <div class="modal-buttons">
-                <button id="btn-descargar" class="btn-primario">📥 Descargar</button>
-                <button id="btn-cerrar-modal" class="btn-secundario">Cerrar</button>
+                <div class="qr-info">
+                    <p class="qr-text">¡Gracias por visitarnos!</p>
+                    <p class="qr-text-sub">Museo de Trajes de Bogotá</p>
+                </div>
+                
+                <div class="modal-buttons">
+                    <button id="btn-descargar" class="btn-accion interactable">Descargar Imagen</button>
+                    <button id="btn-cerrar-modal" class="btn-accion secundario interactable">Cerrar</button>
+                </div>
             </div>
         </div>
     </div>
