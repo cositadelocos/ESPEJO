@@ -1362,7 +1362,15 @@ function updateAndDrawCloud(landmarks, ctx, width, height) {
 function checkVirtualButtonClicks(landmarks, baseCanvas) {
     if (!landmarks || State.botonCooldown) return;
     
-    const botones = document.querySelectorAll('.btn-tela');
+    // Seleccionar todos los elementos interactuables (telas, cápsulas, cerrar, volver, descargas) que están presentes
+    const botonesNodeList = document.querySelectorAll('.interactable');
+    if (!botonesNodeList.length) return;
+    
+    // Extraer solo los elementos que son visibles actualmente (no ocultos ni dentro de un .hidden parent)
+    const botones = Array.from(botonesNodeList).filter(btn => {
+        return btn.offsetWidth > 0 && btn.offsetHeight > 0 && btn.closest('.hidden') === null;
+    });
+    
     if (!botones.length) return;
 
     const wrists = [landmarks[15], landmarks[16]];
