@@ -464,15 +464,15 @@ function detectarPersonaCompleta(landmarks) {
             const hombroX = (hombroIzq.x + hombroDer.x) / 2;
             const hombroY = (hombroIzq.y + hombroDer.y) / 2;
             
-            // Permitimos un margen en el centro, MÁS ESTRICTO ahora (ej. entre 0.40 y 0.60)
+            // Centro horizontal de los hombros ajustado para encajar justo en el hueco
             if (hombroX < 0.38 || hombroX > 0.62) estaCentrado = false;
 
-            // Anchura de hombros estricta para asegurar distancia correcta
+            // Anchura de hombros (asegura la distancia focal y "escala")
             const anchoHombros = Math.abs(hombroIzq.x - hombroDer.x);
             if (anchoHombros < 0.17 || anchoHombros > 0.38) estaCentrado = false;
 
-            // La altura de los hombros debe coincidir con la silueta (usualmente entre 0.25 y 0.50)
-            if (hombroY < 0.25 || hombroY > 0.50) estaCentrado = false;
+            // ¡Altura de los hombros estricta para asegurar que están en la mitad superior de la pantalla!
+            if (hombroY < 0.30 || hombroY > 0.65) estaCentrado = false;
         } else {
             estaCentrado = false;
         }
