@@ -864,3 +864,48 @@ html, body {
     font-style: italic;
     padding: 10px;
 }
+
+/* ========================================
+   MODIFICACIONES DE DISEÑO (IPAD 11" GRID)
+   ======================================== */
+   
+/* Subir los 3 botones principales a la altura de D7 (Fila 7 = mitad de la pantalla) */
+.botones-telas {
+    top: 50vh !important;
+    bottom: auto !important;
+}
+
+/* Cuadro de información del traje: Escalado en celdas B9 a I11 */
+#info-traje {
+    position: absolute !important;
+    top: 66.6vh !important;     /* Inicia en la fila 9 */
+    left: 10vw !important;      /* Inicia en columna B */
+    width: 80vw !important;     /* Abarca hasta la columna I */
+    height: 25vh !important;    /* Termina en la fila 11 */
+    transform: none !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: center !important;
+    align-items: center !important;
+    background: rgba(20, 10, 5, 0.4); /* Fondo translúcido opcional para definir la caja */
+    border-radius: 20px;
+}
+
+#nombre-traje {
+    font-size: clamp(2rem, 4vw, 3rem) !important;
+}
+
+#ubicacion-traje {
+    font-size: clamp(1.2rem, 2.5vw, 1.8rem) !important;
+}
+
+/* Botón "Volver" en la captura (casilla H3) */
+#btn-cerrar-modal {
+    position: fixed !important;
+    top: 16.6vh !important;     /* Inicia en la fila 3 */
+    left: 70vw !important;      /* Inicia en columna H */
+    transform: none !important;
+    z-index: 9999 !important;
+    font-size: 1.2rem !important;
+    padding: 15px 30px !important;
+}

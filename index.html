@@ -225,30 +225,5 @@
     <canvas id="overlay-canvas" class="mirrored"></canvas>
 
     <script src="app.js"></script>
-
-    <!-- TEMPORARY GRID OVERLAY (EASY TO DELETE LATER) -->
-    <div id="debug-grid" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 9999; display: grid; grid-template-columns: repeat(10, 1fr); grid-template-rows: repeat(12, 1fr); pointer-events: none;">
-    </div>
-    <script>
-        const tmpGrid = document.getElementById('debug-grid');
-        const cols = ['A','B','C','D','E','F','G','H','I','J'];
-        for (let r = 1; r <= 12; r++) {
-            for (let c = 0; c < 10; c++) {
-                const cell = document.createElement('div');
-                cell.style.border = '1px dashed rgba(255, 255, 255, 0.4)';
-                cell.style.display = 'flex';
-                cell.style.alignItems = 'center';
-                cell.style.justifyContent = 'center';
-                cell.style.color = 'rgba(212, 165, 116, 0.8)';
-                cell.style.fontSize = '12px';
-                cell.style.fontWeight = 'bold';
-                cell.style.textShadow = '1px 1px 3px #000';
-                cell.style.boxSizing = 'border-box';
-                cell.textContent = cols[c] + r;
-                tmpGrid.appendChild(cell);
-            }
-        }
-    </script>
-    <!-- END TEMPORARY GRID OVERLAY -->
 </body>
 </html>
