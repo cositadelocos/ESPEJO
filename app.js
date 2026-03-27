@@ -241,8 +241,9 @@ function initEventListeners() {
 
         document.addEventListener('fullscreenchange', () => {
             if (document.fullscreenElement) {
-                btnFullscreen.innerHTML = '✖ Salir Pantalla Completa';
+                btnFullscreen.style.display = 'none'; // Kiosk mode: oculta el botón
             } else {
+                btnFullscreen.style.display = 'flex';
                 btnFullscreen.innerHTML = '⛶ Pantalla Completa';
             }
         });
